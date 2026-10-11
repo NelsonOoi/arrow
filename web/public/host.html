@@ -48,7 +48,7 @@
     .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; }
     .brand b { font-weight: 600; font-size: 20px; letter-spacing: -0.01em; }
     .nav { display: flex; flex-direction: column; gap: 4px; }
-    .nav > span { position: relative; display: inline-flex; min-height: 40px; align-items: center; font-size: 17px; }
+    .nav > a > span { position: relative; display: inline-flex; min-height: 40px; align-items: center; font-size: 17px; }
     .scribble { position: absolute; left: 0; bottom: 4px; width: 100%; height: 2px; background: var(--ink); }
     .rail label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 6px; }
     .rail select {
@@ -79,6 +79,17 @@
     .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
     .live.idle { color: var(--ink-soft); }
     .lede { color: var(--ink-soft); font-size: 17px; margin-top: 10px; max-width: 720px; }
+
+    /* events list */
+    .events { list-style: none; margin: 0; padding: 0; border-top: 1.5px solid var(--ink); }
+    .events a { display: grid; grid-template-columns: 1fr auto; gap: 4px 24px; padding: 18px 4px; border-bottom: 1px solid var(--rule); text-decoration: none; transition: background 160ms var(--ease); }
+    .events a:hover { background: var(--paper-sunk); color: inherit; }
+    .ev-name { font-size: 20px; font-weight: 600; }
+    .ev-meta { grid-column: 1; color: var(--ink-soft); }
+    .ev-meta b { color: var(--ink); font-weight: 600; }
+    .ev-date { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--ink-faint); font-size: 13px; }
+    .back { display: inline-block; color: var(--ink-soft); text-decoration: none; margin-bottom: 12px; }
+    .back:hover { color: var(--ink); }
 
     /* metrics band */
     .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px; padding: 24px 0; border-top: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink); margin: 32px 0; }
@@ -167,8 +178,6 @@
       .shell { flex-direction: column; }
       .rail { flex: none; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 16px; border-right: 0; border-bottom: var(--rule-hand); }
       .nav, .rail .foot { display: none; }
-      .rail .pick { flex: 1; min-width: 160px; }
-      .rail label { display: none; }
       .page { padding: 24px 16px; }
       h1 { font-size: 34px; }
       .col-hide { display: none; }
@@ -182,12 +191,7 @@
         <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.5 C 24 2, 30 8.5, 29.5 16.5 C 29 24, 23 29.8, 15.5 29.5 C 8 29.2, 2.3 23, 2.6 15.5 C 2.9 8, 8.5 3, 16 2.5 Z" fill="var(--ink)"/><path d="M10.5 21.5 L21 11 M13.5 10.8 H21.2 V18.5" stroke="var(--paper)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <b>Arrow</b>
       </a>
-      <nav class="nav" aria-label="Main"><span>Events<span class="scribble" aria-hidden="true"></span></span></nav>
-      <div class="pick">
-        <label for="picker">Event</label>
-        <select id="picker"></select>
-      </div>
-      <button class="btn btn--quiet" id="new-event" style="align-self:flex-start">+ Create event</button>
+      <nav class="nav" aria-label="Main"><a href="/" id="nav-events" style="text-decoration:none"><span>Events<span class="scribble" aria-hidden="true"></span></span></a></nav>
       <div class="foot" id="clock"></div>
     </aside>
     <main><div class="page" id="app"></div></main>
@@ -197,7 +201,6 @@
 
   <script>
     const app = document.getElementById("app");
-    const picker = document.getElementById("picker");
     const dlg = document.getElementById("dlg");
     let eventId = new URLSearchParams(location.search).get("event");
     let data = null;
@@ -238,22 +241,83 @@
     setInterval(tickClock, 15000);
 
     // ---------- events ----------
-    async function loadPicker() {
-      const events = await api("/events");
-      if (!eventId && events.length) eventId = events[0].id;
-      picker.innerHTML = events.map((e) => `<option value="${esc(e.id)}" ${e.id === eventId ? "selected" : ""}>${esc(e.name)}</option>`).join("");
-      if (!events.length) {
-        app.innerHTML = `<h1>Your <em style="color:var(--pen);font-style:italic">events</em></h1><p class="lede">Nothing here yet. Create your first event.</p>`;
-        showCreate();
-      }
+    function openEvent(id) {
+      eventId = id;
+      history.pushState(null, "", `?event=${id}`);
+      lastJson = "";
+      app.innerHTML = "";
+      refresh();
+      window.scrollTo(0, 0);
     }
-    picker.addEventListener("change", () => {
-      eventId = picker.value;
-      history.replaceState(null, "", `?event=${eventId}`);
+    function goList() {
+      eventId = null;
+      history.pushState(null, "", "/");
+      lastJson = "";
+      refresh();
+    }
+    window.addEventListener("popstate", () => {
+      eventId = new URLSearchParams(location.search).get("event");
       lastJson = "";
       refresh();
     });
-    document.getElementById("new-event").addEventListener("click", showCreate);
+    document.getElementById("nav-events").addEventListener("click", (e) => { e.preventDefault(); goList(); });
+
+    function renderList(events) {
+      app.innerHTML = `
+        <div class="section-head" style="align-items:center;margin-bottom:24px">
+          <h1>Events</h1>
+          <div class="actions">
+            <button class="btn btn--outline" id="import-partiful">Import from Partiful</button>
+            <button class="btn btn--primary" id="new-event">Create event</button>
+          </div>
+        </div>
+        ${events.length ? `<ul class="events">${events.map((e) => `
+          <li><a href="?event=${esc(e.id)}" data-open="${esc(e.id)}">
+            <span class="ev-name">${esc(e.name)}</span>
+            <span class="ev-meta"><b>${e.guests}</b> guests · <b>${e.answered}</b> answered · <b>${e.matched}</b> matched${e.calls_on ? ` · <span class="tag indigo">Calling now</span>` : ""}</span>
+            <span class="ev-date mono">${new Date(e.created_at).toLocaleDateString([], { month: "short", day: "numeric" })}</span>
+          </a></li>`).join("")}</ul>` : `<p class="lede">Nothing here yet. Import a Partiful event or create one.</p>`}`;
+      document.getElementById("new-event").addEventListener("click", showCreate);
+      document.getElementById("import-partiful").addEventListener("click", showImport);
+      app.querySelectorAll("[data-open]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); openEvent(a.dataset.open); }));
+    }
+
+    // MOCK: Partiful has no public API, so any link imports this sample event.
+    const PARTIFUL_SAMPLE = {
+      name: "Build Night: Founders & Friends",
+      description: "A relaxed evening for people building early-stage startups: founders, first engineers, designers, and a handful of seed investors. No pitches, no panels. Drinks and snacks provided.",
+      type: "networking",
+      guests: ["Ava Martin", "Ben Okoye", "Cleo Park", "Dev Shah", "Elena Rossi", "Finn Murphy", "Gia Tran", "Hugo Lefebvre", "Ines Duarte", "Jonah Kim",
+        "Kira Novak", "Leo Bernstein", "Maya Singh", "Nico Alvarez", "Omar Farouk", "Priya Nair"],
+    };
+    function showImport() {
+      openDlg(`
+        <h2>Import from Partiful</h2>
+        <p class="soft">Paste your Partiful event link. Arrow brings in the event and its guest list.</p>
+        <label for="pf-url">Partiful link</label>
+        <input type="text" id="pf-url" placeholder="partiful.com/e/..." autocomplete="off" />
+        <button class="btn btn--quiet" id="pf-sample" style="align-self:flex-start;padding:0;min-height:0">Use a sample link</button>
+        <p class="soft" id="pf-status" style="min-height:22px"></p>
+        <div class="row-end"><button class="btn btn--quiet" data-close>Cancel</button><button class="btn btn--primary" id="pf-go">Import</button></div>`);
+      const url = document.getElementById("pf-url");
+      const status = document.getElementById("pf-status");
+      document.getElementById("pf-sample").addEventListener("click", () => { url.value = "partiful.com/e/bN7xq2LmT4sample"; url.focus(); });
+      document.getElementById("pf-go").addEventListener("click", async (e) => {
+        if (!/partiful\.com\/e\/\w+/i.test(url.value)) { status.textContent = "That doesn't look like a Partiful event link."; return url.focus(); }
+        e.target.disabled = true;
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        status.textContent = "Reading the event…";
+        await wait(700);
+        const ev = await api("/gatherings", { body: { name: PARTIFUL_SAMPLE.name, description: PARTIFUL_SAMPLE.description, type: PARTIFUL_SAMPLE.type, host: "Partiful import" } });
+        status.textContent = `Importing ${PARTIFUL_SAMPLE.guests.length} guests…`;
+        const csv = PARTIFUL_SAMPLE.guests.map((n, i) => `${n}, +1555020${String(i).padStart(4, "0")}`).join("\n");
+        const { added } = await api(`/gatherings/${ev.id}/people`, { body: { csv } });
+        await wait(400);
+        dlg.close();
+        openEvent(ev.id);
+        toast(`Imported ${added} guests from Partiful`);
+      });
+    }
 
     function showCreate() {
       openDlg(`
@@ -271,15 +335,11 @@
       document.getElementById("ev-go").addEventListener("click", async () => {
         const name = document.getElementById("ev-name").value.trim();
         if (!name) return document.getElementById("ev-name").focus();
-        const ev = await api("/events", {
+        const ev = await api("/gatherings", {
           body: { name, description: document.getElementById("ev-desc").value, type: document.querySelector('input[name="type"]:checked').value },
         });
         dlg.close();
-        eventId = ev.id;
-        history.replaceState(null, "", `?event=${eventId}`);
-        await loadPicker();
-        lastJson = "";
-        refresh();
+        openEvent(ev.id);
       });
     }
 
@@ -292,6 +352,15 @@
     function render() {
       const { event, people, stats, callsRunning, log } = data;
       const waiting = stats.pending - stats.calling;
+      // Matchmaker handoff (MATCHER=matchmaker): requested → running → done | failed
+      const mm = event.mm_status;
+      const matching = mm === "requested" || mm === "running";
+      const stale = mm === "requested" && Date.now() - Date.parse(event.mm_requested_at) > 30000;
+      const mmLine =
+        stale ? `Waiting for the matchmaker to pick this up…` :
+        mm === "requested" ? "Sent to the matchmaker…" :
+        mm === "running" ? (event.mm_total ? `Jev scored ${event.mm_done} of ${event.mm_total} pairs` : "Matchmaker is starting…") :
+        mm === "failed" ? `Matchmaker failed: ${event.mm_error ?? "unknown error"}` : "";
       const needs = people.filter((p) => ["failed", "sms_sent"].includes(p.status)).length;
       const tabs = [["all", "All", people.length], ["attention", "Needs attention", needs], ["answered", "Answered", stats.answered], ["matched", "Matched", stats.matched]];
       const shown = people.filter((p) =>
@@ -301,6 +370,7 @@
       const opening = `Hi! This is the AI assistant for ${event.name}. We find you the person you should meet. Got 60 seconds for ${plan().length} quick questions?`;
 
       app.innerHTML = `
+        <a href="/" class="back" id="back">← All events</a>
         <h1>${esc(event.name)}</h1>
         ${event.description ? `<p class="lede">${esc(event.description)}</p>` : ""}
 
@@ -321,6 +391,7 @@
               <span class="metric"><b>${stats.matched}</b> matched</span>
               <span class="metric"><b>${stats.linksSent}</b> of ${stats.matched} links sent</span>
             </div>
+            ${mmLine ? `<p class="hint" ${mm === "failed" || stale ? 'style="color:var(--pen)"' : ""}>${esc(mmLine)}</p>` : ""}
           </div>
         </section>
 
@@ -328,7 +399,7 @@
           ${callsRunning
             ? `<button class="btn btn--primary" data-act="stop">Pause calls (${stats.pending} left)</button>`
             : `<button class="btn btn--primary" data-act="call" ${!stats.pending && !stats.failed ? "disabled" : ""}>Call everyone</button>`}
-          <button class="btn btn--ink" data-act="match" ${stats.answered < 2 ? "disabled" : ""}>${stats.matched ? "Re-run matching" : "Run matching"}</button>
+          <button class="btn btn--ink" data-act="match" ${stats.answered < 2 || matching ? "disabled" : ""}>${matching ? "Matching…" : stats.matched ? "Re-run matching" : "Run matching"}</button>
           <button class="btn btn--outline" data-act="links" ${!stats.matched ? "disabled" : ""}>Text links</button>
           <button class="btn btn--quiet" data-act="add">+ Add guests</button>
         </div>
@@ -382,6 +453,7 @@
         </section>
       `;
 
+      document.getElementById("back").addEventListener("click", (e) => { e.preventDefault(); goList(); });
       app.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => act(b.dataset.act, b)));
       app.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { tab = b.dataset.tab; render(); }));
       app.querySelectorAll("tbody tr[data-uid]").forEach((r) => {
@@ -443,7 +515,7 @@
         <textarea id="csv" placeholder="Maya Chen, 514 555 0123&#10;Daniel Okafor, +15145550188"></textarea>
         <div class="row-end"><button class="btn btn--quiet" data-close>Cancel</button><button class="btn btn--primary" id="add-go">Add guests</button></div>`);
       document.getElementById("add-go").addEventListener("click", async () => {
-        const { added } = await api(`/events/${eventId}/people`, { body: { csv: document.getElementById("csv").value } });
+        const { added } = await api(`/gatherings/${eventId}/people`, { body: { csv: document.getElementById("csv").value } });
         dlg.close();
         toast(`Added ${added} guest${added === 1 ? "" : "s"}`);
         refresh();
@@ -469,12 +541,12 @@
       if (ask && !confirm(ask)) return;
       btn.disabled = true;
       try {
-        const r = await api(`/events/${eventId}/${{ call: "call", stop: "stop", collect: "collect", match: "match", links: "send-links" }[kind]}`, { body: {} });
+        const r = await api(`/gatherings/${eventId}/${{ call: "call", stop: "stop", collect: "collect", match: "match", links: "send-links" }[kind]}`, { body: {} });
         toast(
           kind === "call" ? `Calling ${r.queued} guests` :
           kind === "stop" ? "Pausing after the current call" :
           kind === "collect" ? `${r.collected} new replies` :
-          kind === "match" ? `Matched ${r.people} guests (${r.mutual} mutual)` : `Sent ${r.sent} links`,
+          kind === "match" ? (r.queued ? `Sent ${r.queued} guests to the matchmaker` : `Matched ${r.people} guests (${r.mutual} mutual)`) : `Sent ${r.sent} links`,
         );
       } catch (e) {
         toast(e.message);
@@ -484,9 +556,14 @@
     }
 
     async function refresh() {
-      if (!eventId) return;
       try {
-        const next = await api(`/events/${eventId}`);
+        if (!eventId) {
+          const events = await api("/gatherings");
+          const json = JSON.stringify(events);
+          if (json !== lastJson && !dlg.open) { lastJson = json; renderList(events); }
+          return;
+        }
+        const next = await api(`/gatherings/${eventId}`);
         data = next;
         const json = JSON.stringify(next);
         // don't redraw under an open dialog or while typing in search or the call plan
@@ -501,7 +578,6 @@
     }
 
     (async () => {
-      await loadPicker();
       await refresh();
       setInterval(refresh, 3000);
     })();

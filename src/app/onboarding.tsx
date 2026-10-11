@@ -4,15 +4,20 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { text } from '@/components/typography';
-import { USERS } from '@/data/users';
+import { stepAway } from '@/live/actions';
+import { useRoster } from '@/store/roster';
 import { useSession } from '@/store/session';
 import { colors, spacing } from '@/theme';
 
 export default function OnboardingScreen() {
   const currentUserId = useSession((s) => s.currentUserId);
   const setCurrentUser = useSession((s) => s.setCurrentUser);
+  const event = useRoster((s) => s.event);
+  const users = useRoster((s) => s.users);
 
   const choose = (id: string) => {
+    // Take the previous identity out of the pool so the matchmaker doesn't pair someone who left.
+    if (currentUserId && currentUserId !== id) stepAway(currentUserId);
     setCurrentUser(id);
     // Reached from Profile, the tabs are already underneath; otherwise onboarding is the only route.
     if (router.canGoBack()) {
@@ -24,8 +29,9 @@ export default function OnboardingScreen() {
 
   return (
     <Screen edges={['left', 'right', 'bottom']}>
+      {event ? <Text style={text.heading}>{event.name}</Text> : null}
       <Text style={text.muted}>Pick a different person on each demo phone.</Text>
-      {USERS.map((user) => (
+      {users.map((user) => (
         <Pressable
           key={user.id}
           accessibilityRole="button"
@@ -33,12 +39,14 @@ export default function OnboardingScreen() {
           style={({ pressed }) => pressed && styles.pressed}>
           <Card highlight={user.id === currentUserId}>
             <Text style={text.heading}>{user.name}</Text>
-            <Text style={text.muted}>
-              {user.role} @ {user.company}
+            <Text style={text.muted} numberOfLines={2}>
+              {user.about}
             </Text>
-            <View style={styles.interests}>
-              <Text style={text.small}>{user.interests.join(' · ')}</Text>
-            </View>
+            {user.interests.length > 0 ? (
+              <View style={styles.interests}>
+                <Text style={text.small}>{user.interests.join(' · ')}</Text>
+              </View>
+            ) : null}
           </Card>
         </Pressable>
       ))}

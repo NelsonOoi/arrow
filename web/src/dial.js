@@ -2,7 +2,7 @@
 const BASE = "https://api.getdial.ai/api/v1";
 
 async function req(env, method, path, body, headers = {}) {
-  if (!env.DIAL_API_KEY) throw new Error("DIAL_API_KEY not set (wrangler secret put DIAL_API_KEY)");
+  if (!env.DIAL_API_KEY) throw new Error("DIAL_API_KEY not set (vercel env add DIAL_API_KEY)");
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers: { authorization: `Bearer ${env.DIAL_API_KEY}`, "content-type": "application/json", ...headers },

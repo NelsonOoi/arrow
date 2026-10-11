@@ -1,0 +1,61 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": [
+    "yul1"
+  ],
+  "services": {
+    "web": {
+      "root": "web",
+      "entrypoint": "server.js",
+      "devCommand": "node dev.js",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "matchmaker",
+          "format": "url",
+          "env": "MATCHMAKER_URL"
+        }
+      ],
+      "rewrites": [
+        {
+          "source": "/",
+          "destination": "/host.html"
+        },
+        {
+          "source": "/m/:token",
+          "destination": "/m.html"
+        }
+      ]
+    },
+    "matchmaker": {
+      "root": ".",
+      "entrypoint": "matchmaker.vercel_app:app",
+      "functions": {
+        "matchmaker/vercel_app.py": {
+          "maxDuration": 300,
+          "excludeFiles": "{node_modules/**,web/**,src/**,assets/**,pitch/**,demo/**,tests/**,scripts/**,migrations/**,supabase/**,.expo/**}"
+        }
+      },
+      "rewrites": [
+        {
+          "source": "/mm/:path(.*)?",
+          "destination": "/:path"
+        }
+      ]
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/mm/(.*)",
+      "destination": {
+        "service": "matchmaker"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "web"
+      }
+    }
+  ]
+}

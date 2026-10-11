@@ -6,7 +6,7 @@ import { Card } from '@/components/Card';
 import { FinderView } from '@/components/FinderView';
 import { Screen } from '@/components/Screen';
 import { text } from '@/components/typography';
-import { firstName, getUserById, getUserByToken, matchColor } from '@/data/users';
+import { firstName, getUserById, getUserByToken, matchColor, sharedInterests } from '@/data/users';
 import { useScanWhileMounted } from '@/proximity/useScanWhileMounted';
 import { useRadar } from '@/store/radar';
 import { useSession } from '@/store/session';
@@ -44,6 +44,7 @@ export default function FindScreen() {
   }
 
   const first = firstName(user);
+  const topic = sharedInterests(currentUser, user)[0] ?? user.interests[0];
 
   return (
     <FinderView
@@ -56,7 +57,7 @@ export default function FindScreen() {
           ? { rssi: peer.smoothedRssi, rawRssi: peer.lastRssi, lastSeen: peer.lastSeen }
           : undefined
       }
-      note={`Opener: ask about ${user.workingOn}`}>
+      note={topic ? `Opener: ask about ${topic}` : undefined}>
       <Button
         size="lg"
         variant="ink"
