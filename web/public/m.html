@@ -21,6 +21,7 @@
     .hello h1 { font-size: 32px; line-height: 1.1; }
     .hello p { margin: 8px 0 24px; color: var(--muted); }
 
+    .app-open { margin-bottom: 20px; }
     .incoming {
       display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: 16px;
       border-radius: var(--radius); color: #0c0b10; font-weight: 600; cursor: pointer; border: 0; width: 100%; text-align: left;
@@ -93,6 +94,16 @@
 
   <script>
     const token = location.pathname.split("/").filter(Boolean)[1];
+    // Hand off to the Arrow app (scheme "arrow", screen src/app/match/[token].tsx).
+    // On a phone, open it once per visit; the button below covers a blocked jump.
+    const appUrl = `arrow://match/${encodeURIComponent(token)}`;
+    try {
+      const key = `opened-app-${token}`;
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) && !sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, "1");
+        location.href = appUrl;
+      }
+    } catch {}
     const app = document.getElementById("app");
     const beaconEl = document.getElementById("beacon");
     let state = null;
@@ -121,6 +132,7 @@
       const showIncoming = incoming && !dismissed.has(incoming.id) && !(beacon && beacon.id === incoming.id);
 
       app.innerHTML = `
+        <a class="btn block app-open" href="${appUrl}">Open in the Arrow app</a>
         <header>
           <span class="brand">${icon}Arrow</span>
           <span class="event">${esc(event.name)}</span>
