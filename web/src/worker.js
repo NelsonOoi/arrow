@@ -218,7 +218,9 @@ route("POST", "/api/events/:id/people", async (req, env, { id }) => {
     const parts = line.split(",").map((s) => s.trim());
     const phoneIdx = parts.findIndex((s) => /\d{7,}/.test(s.replace(/\D/g, "")));
     if (phoneIdx < 0) continue;
-    rows.push({ uid: newId("u"), event_id: id, name: parts.filter((_, i) => i !== phoneIdx).join(" ").trim(), phone: normalizePhone(parts[phoneIdx]), token: rand(9) });
+    // stagger timestamps by 1ms so the list keeps the pasted order
+    const created_at = new Date(Date.now() + rows.length).toISOString();
+    rows.push({ uid: newId("u"), event_id: id, name: parts.filter((_, i) => i !== phoneIdx).join(" ").trim(), phone: normalizePhone(parts[phoneIdx]), token: rand(9), created_at });
   }
   if (rows.length) await insert(env, "people", rows);
   await log(env, id)(`Added ${rows.length} guests`);

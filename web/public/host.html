@@ -188,6 +188,7 @@
         <select id="picker"></select>
       </div>
       <button class="btn btn--quiet" id="new-event" style="align-self:flex-start">+ Create event</button>
+      <button class="btn btn--quiet" id="import-partiful" style="align-self:flex-start;margin-top:-24px">Import from Partiful</button>
       <div class="foot" id="clock"></div>
     </aside>
     <main><div class="page" id="app"></div></main>
@@ -254,6 +255,48 @@
       refresh();
     });
     document.getElementById("new-event").addEventListener("click", showCreate);
+    document.getElementById("import-partiful").addEventListener("click", showImport);
+
+    // MOCK: Partiful has no public API, so any link imports this sample event.
+    const PARTIFUL_SAMPLE = {
+      name: "Build Night: Founders & Friends",
+      description: "A relaxed evening for people building early-stage startups: founders, first engineers, designers, and a handful of seed investors. No pitches, no panels. Drinks and snacks provided.",
+      type: "networking",
+      guests: ["Ava Martin", "Ben Okoye", "Cleo Park", "Dev Shah", "Elena Rossi", "Finn Murphy", "Gia Tran", "Hugo Lefebvre", "Ines Duarte", "Jonah Kim",
+        "Kira Novak", "Leo Bernstein", "Maya Singh", "Nico Alvarez", "Omar Farouk", "Priya Nair"],
+    };
+    function showImport() {
+      openDlg(`
+        <h2>Import from Partiful</h2>
+        <p class="soft">Paste your Partiful event link. Arrow brings in the event and its guest list.</p>
+        <label for="pf-url">Partiful link</label>
+        <input type="text" id="pf-url" placeholder="partiful.com/e/..." autocomplete="off" />
+        <button class="btn btn--quiet" id="pf-sample" style="align-self:flex-start;padding:0;min-height:0">Use a sample link</button>
+        <p class="soft" id="pf-status" style="min-height:22px"></p>
+        <div class="row-end"><button class="btn btn--quiet" data-close>Cancel</button><button class="btn btn--primary" id="pf-go">Import</button></div>`);
+      const url = document.getElementById("pf-url");
+      const status = document.getElementById("pf-status");
+      document.getElementById("pf-sample").addEventListener("click", () => { url.value = "partiful.com/e/bN7xq2LmT4sample"; url.focus(); });
+      document.getElementById("pf-go").addEventListener("click", async (e) => {
+        if (!/partiful\.com\/e\/\w+/i.test(url.value)) { status.textContent = "That doesn't look like a Partiful event link."; return url.focus(); }
+        e.target.disabled = true;
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        status.textContent = "Reading the event…";
+        await wait(700);
+        const ev = await api("/events", { body: { name: PARTIFUL_SAMPLE.name, description: PARTIFUL_SAMPLE.description, type: PARTIFUL_SAMPLE.type, host: "Partiful import" } });
+        status.textContent = `Importing ${PARTIFUL_SAMPLE.guests.length} guests…`;
+        const csv = PARTIFUL_SAMPLE.guests.map((n, i) => `${n}, +1555020${String(i).padStart(4, "0")}`).join("\n");
+        const { added } = await api(`/events/${ev.id}/people`, { body: { csv } });
+        await wait(400);
+        dlg.close();
+        eventId = ev.id;
+        history.replaceState(null, "", `?event=${eventId}`);
+        await loadPicker();
+        lastJson = "";
+        await refresh();
+        toast(`Imported ${added} guests from Partiful`);
+      });
+    }
 
     function showCreate() {
       openDlg(`
