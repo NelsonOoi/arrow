@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arrow Pitch</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+@page { size: 1920px 1080px; margin: 0; }
+html, body { margin: 0; background: #1a1a1f; }
+.slide { position: relative; width: 1920px; height: 1080px; box-sizing: border-box; overflow: hidden; margin: 0 auto 24px; break-after: page; }
+.slide * { box-sizing: border-box; margin: 0; }
+@media print { .slide { margin: 0; } body { background: none; } }
+</style></head><body>
+<section class="slide" id="cover" data-transition="fade" style="background:radial-gradient(ellipse at 85% 10%, #3a1a14 0%, #0c0b10 60%);color:#f3f2f7;font-family:'Inter', Arial, sans-serif;padding:128px 128px 160px">
+<p style="position:absolute;left:128px;top:144px;width:600px;font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:700;letter-spacing:6px;text-transform:uppercase;color:#ff5a36">Arrow</p>
+<h1 style="position:absolute;left:128px;top:216px;width:1664px;font-family:'Space Grotesk', Arial, sans-serif;font-size:120px;font-weight:700;line-height:1.1;letter-spacing:-3px;color:#f3f2f7">Arrow points you to your</h1>
+<iframe style="position:absolute;left:128px;top:376px;width:1664px;height:480px;border:0;background:transparent" srcdoc="&lt;!doctype html&gt;&lt;html&gt;&lt;head&gt;&lt;style&gt;
+html,body{margin:0;height:100%;overflow:hidden;background:transparent}
+body{padding-top:16px}
+.w{display:block;height:108px;line-height:108px;white-space:nowrap;font:800 88px &quot;SF Pro Display&quot;,-apple-system,&quot;Helvetica Neue&quot;,Arial,sans-serif;letter-spacing:-3px;color:rgba(243,242,247,.2);transition:color .35s ease,transform .35s ease}
+.w.on{color:#ff5a36;transform:translateX(28px)}
+&lt;/style&gt;&lt;/head&gt;&lt;body&gt;
+&lt;div class=&quot;w on&quot;&gt;cofounder.&lt;/div&gt;&lt;div class=&quot;w&quot;&gt;investor.&lt;/div&gt;&lt;div class=&quot;w&quot;&gt;next hire.&lt;/div&gt;&lt;div class=&quot;w&quot;&gt;future wife.&lt;/div&gt;
+&lt;script&gt;
+const w=document.querySelectorAll(&quot;.w&quot;);let i=0;
+if(!matchMedia(&quot;(prefers-reduced-motion: reduce)&quot;).matches)
+setInterval(()=&gt;{i=(i+1)%w.length;w.forEach((el,j)=&gt;el.classList.toggle(&quot;on&quot;,j===i));},1400);
+&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;"></iframe>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#8e8b99">Marco · Sun · Scott · Nelson</p>
+
+</section>
+
+<section class="slide" id="how" data-transition="fade" style="background:#0c0b10;color:#f3f2f7;font-family:'Inter', Arial, sans-serif;padding:112px 128px;display:flex;flex-direction:column;gap:48px">
+<h2 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:96px;font-weight:700;line-height:1.05;letter-spacing:-2.5px;color:#f3f2f7">Call. Match. Meet.</h2>
+<div style="display:flex;gap:64px;align-items:center;flex:1">
+<div style="flex:1;display:flex;flex-direction:column">
+<div style="display:flex;gap:28px;align-items:baseline;padding:24px 0px;border-top:1px solid #2a2933">
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:700;color:#ff5a36;width:56px">01</p>
+<p style="font-size:36px;line-height:1.3;color:#f3f2f7">Pick up the phone. <span style="color:#8e8b99">Say what you're looking for.</span></p>
+</div>
+<div style="display:flex;gap:28px;align-items:baseline;padding:24px 0px;border-top:1px solid #2a2933">
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:700;color:#ff5a36;width:56px">02</p>
+<p style="font-size:36px;line-height:1.3;color:#f3f2f7">We match you <span style="color:#8e8b99">with one person in the room.</span></p>
+</div>
+<div style="display:flex;gap:28px;align-items:baseline;padding:24px 0px;border-top:1px solid #2a2933;border-bottom:1px solid #2a2933">
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:700;color:#ff5a36;width:56px">03</p>
+<p style="font-size:36px;line-height:1.3;color:#f3f2f7">Tap your text link <span style="color:#8e8b99">and find your match.</span></p>
+</div>
+</div>
+<img src="img/match-page.png" alt="Match page on a phone: Sun, meet Maya. It's mutual: Maya wants to meet you too, with the reason and a Find Maya button" style="width:280px;height:560px;object-fit:cover;border-radius:36px;border:4px solid #2a2933">
+<img src="img/beacon.png" alt="Maya's phone lit up orange: Sun Ha is looking for you, hold your phone up" style="width:280px;height:560px;object-fit:cover;border-radius:36px;border:4px solid #2a2933">
+</div>
+
+</section>
+
+<section class="slide" id="win" data-transition="fade" style="background:#f6f5f2;color:#16151a;font-family:'Inter', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;justify-content:space-between;gap:48px">
+<div style="display:flex;flex-direction:column;gap:28px">
+<h2 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:112px;font-weight:700;line-height:1.02;letter-spacing:-3px;color:#16151a;width:1600px"><span style="color:#d8431f">9 years</span> of small talk, saved at SF Tech Week.</h2>
+<p style="font-size:32px;line-height:1.4;color:#6b6873">1,593 events × 50 guests × 1 hour finding the right person = 80,000 hours.</p>
+</div>
+<div style="display:flex;gap:24px">
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#16151a;border-radius:20px;padding:28px">
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:700;color:#ff5a36">40%</p>
+<p style="font-size:24px;line-height:1.35;color:#f3f2f7">Time saved: 9 years</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#ffffff;border:1px solid #e2dfd8;border-radius:20px;padding:28px">
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:700;color:#d8431f">25%</p>
+<p style="font-size:24px;line-height:1.35;color:#16151a">Tech: live AI calls</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#ffffff;border:1px solid #e2dfd8;border-radius:20px;padding:28px">
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:700;color:#d8431f">15%</p>
+<p style="font-size:24px;line-height:1.35;color:#16151a">Market: every event</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#ffffff;border:1px solid #e2dfd8;border-radius:20px;padding:28px">
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:700;color:#d8431f">10%</p>
+<p style="font-size:24px;line-height:1.35;color:#16151a">Original: no form</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#ffffff;border:1px solid #e2dfd8;border-radius:20px;padding:28px">
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:700;color:#d8431f">10%</p>
+<p style="font-size:24px;line-height:1.35;color:#16151a">Demo: you saw it</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6b6873">Built with Dial   ·   Marco · Sun · Scott · Nelson</p>
+
+</section>
+
+</body></html>
