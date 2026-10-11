@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arrow for hosts</title>
+  <link rel="icon" href="/arrow.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+  <style>
+    /* Host dashboard. Look follows Marco's host app (NelsonOoi/arrow, host/DESIGN.md):
+       paper and ink, one pen-red accent, rules not boxes, numbers inside sentences. */
+    :root {
+      --paper: #f4efe6; --paper-raised: #fbf8f2; --paper-sunk: #ece5d8;
+      --ink: #1e1b17; --ink-soft: #5a5248; --ink-faint: #8c8376; --rule: #d9d0c1;
+      --pen: #c2391b; --pen-deep: #9e2c12; --pen-wash: #f7e1d8; --marker: #f6d86b;
+      --moss: #3f6b3a; --moss-wash: #e3ead9; --ochre: #a86a0b; --ochre-wash: #f4e6c8; --indigo: #2f3c8f;
+      --font-body: "Instrument Sans", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, monospace;
+      --radius-control: 10px;
+      --radius-sheet: 18px 14px 20px 12px / 14px 18px 12px 20px;
+      --rule-hand: 1.5px dashed var(--rule);
+      --shadow-lift: 0 1px 0 rgba(30, 27, 23, 0.04), 0 10px 28px -12px rgba(60, 40, 20, 0.28);
+      --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+      color-scheme: light;
+    }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: var(--ink); font: 15px/1.5 var(--font-body); -webkit-font-smoothing: antialiased;
+      background-color: var(--paper);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.25 0 0 0 0 0.15 0 0 0 0.07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    h1, h2, h3 { font-family: var(--font-body); font-weight: 600; letter-spacing: -0.01em; line-height: 1.15; margin: 0; }
+    h1 { font-size: 32px; }
+    h2 { font-size: 20px; }
+    p { margin: 0; }
+    a { color: inherit; }
+    button, input, textarea, select { font: inherit; color: inherit; }
+    :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+    .mono { font-family: var(--font-mono); font-weight: 500; }
+    .soft { color: var(--ink-soft); }
+
+    /* shell */
+    .shell { display: flex; min-height: 100vh; }
+    .rail { flex: 0 0 220px; padding: 32px 24px; display: flex; flex-direction: column; gap: 32px; border-right: var(--rule-hand); }
+    .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .brand b { font-weight: 600; font-size: 20px; letter-spacing: -0.01em; }
+    .nav { display: flex; flex-direction: column; gap: 4px; }
+    .nav > span { position: relative; display: inline-flex; min-height: 40px; align-items: center; font-size: 17px; }
+    .scribble { position: absolute; left: 0; bottom: 4px; width: 100%; height: 2px; background: var(--ink); }
+    .rail label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 6px; }
+    .rail select {
+      width: 100%; min-height: 40px; padding: 0 10px; border-radius: var(--radius-control); border: 1px solid var(--rule);
+      background: var(--paper-raised); cursor: pointer;
+    }
+    .rail .foot { margin-top: auto; font-size: 13px; color: var(--ink-soft); }
+    main { flex: 1; min-width: 0; }
+    .page { max-width: 1180px; padding: 40px; }
+
+    /* buttons */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px;
+      border: 0; border-radius: var(--radius-control); font-weight: 600; cursor: pointer; text-decoration: none;
+      transition: transform 160ms var(--ease), background 160ms var(--ease), color 160ms var(--ease);
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .btn--primary { background: var(--pen); color: #fff; }
+    .btn--primary:hover { background: var(--pen-deep); }
+    .btn--ink { background: var(--ink); color: var(--paper-raised); }
+    .btn--outline { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+    .btn--quiet { background: none; padding: 0 4px; min-height: 36px; text-decoration: underline; text-underline-offset: 4px; font-weight: 500; }
+    .btn--quiet:hover { transform: none; color: var(--pen-deep); }
+
+    /* header */
+    .live { display: inline-flex; align-items: center; gap: 8px; color: var(--pen); font-size: 13px; font-weight: 600; margin-bottom: 8px; min-height: 20px; }
+    .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    .live.idle { color: var(--ink-soft); }
+    .lede { color: var(--ink-soft); font-size: 17px; margin-top: 10px; max-width: 720px; }
+
+    /* metrics band */
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px; padding: 24px 0; border-top: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink); margin: 32px 0; }
+    .metrics h4 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+    .metrics .row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 24px; }
+    .metric { display: inline-flex; align-items: baseline; gap: 8px; color: var(--ink-soft); }
+    .metric b { font-size: 28px; font-weight: 600; color: var(--ink); }
+    .metric.hot b { color: var(--pen); }
+
+    /* actions */
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .hint { color: var(--ink-soft); font-size: 13px; margin-top: 10px; }
+
+    /* two-column body */
+    .cols { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 48px; margin-top: 48px; align-items: start; }
+    .section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+    .sheet { background: var(--paper-raised); border-radius: var(--radius-sheet); padding: 24px; box-shadow: var(--shadow-lift); }
+
+    /* call plan */
+    .plan ol { list-style: none; margin: 0; padding: 0; counter-reset: q; }
+    .plan li { counter-increment: q; display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: start; padding: 12px 0; border-bottom: var(--rule-hand); }
+    .plan li:last-child { border-bottom: 0; }
+    .plan li::before { content: counter(q); font-size: 15px; font-weight: 600; line-height: 1.45; color: var(--ink-soft); }
+    .plan textarea {
+      width: 100%; border: 0; background: transparent; resize: none; padding: 2px 0; line-height: 1.45; font-size: 15px; border-radius: 4px;
+      field-sizing: content; min-height: 22px;
+    }
+    .plan textarea:hover { background: var(--paper-sunk); }
+    .plan textarea:focus { outline: none; background: var(--paper-sunk); }
+    .plan .x { border: 0; background: none; color: var(--ink-faint); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 4px; }
+    .plan .x:hover { color: var(--pen); }
+    .plan .opening { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--rule); }
+    .plan .opening span { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 4px; }
+
+    /* guests */
+    .tabs { display: flex; gap: 20px; }
+    .tab { position: relative; background: none; border: 0; padding: 4px 0 10px; cursor: pointer; color: var(--ink-soft); font-size: 15px; }
+    .tab b { font-weight: 600; }
+    .tab[aria-selected="true"] { color: var(--ink); }
+    .tab .scribble { bottom: 0; width: 100%; }
+    .search { width: 100%; min-height: 44px; padding: 0 14px; margin: 12px 0 4px; border-radius: var(--radius-control); border: 1px solid var(--rule); background: var(--paper-raised); outline: none; }
+    .search:focus { box-shadow: 0 0 0 2px var(--ink); border-color: transparent; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; min-width: 620px; border-collapse: collapse; }
+    th { text-align: left; font-size: 13px; font-weight: 500; color: var(--ink-soft); padding: 10px 12px; border-bottom: 1.5px solid var(--ink); }
+    td { padding: 12px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+    tbody tr { cursor: pointer; transition: background 160ms var(--ease); }
+    tbody tr:hover { background: var(--paper-sunk); }
+    td .who { font-weight: 500; }
+    td .sub { color: var(--ink-soft); font-size: 13px; }
+    .tag { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .tag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .tag.moss { color: var(--moss); } .tag.ochre { color: var(--ochre); } .tag.indigo { color: var(--indigo); }
+    .tag.pen { color: var(--pen); } .tag.faint { color: var(--ink-faint); }
+    .tag.faint::before { background: none; box-shadow: inset 0 0 0 1.5px currentColor; }
+    .empty { padding: 32px 12px; color: var(--ink-soft); text-align: center; }
+
+    /* activity */
+    .log { margin-top: 48px; }
+    .log ul { list-style: none; padding: 0; margin: 12px 0 0; }
+    .log li { display: flex; gap: 14px; padding: 10px 0; border-bottom: var(--rule-hand); font-size: 14px; }
+    .log time { font-family: var(--font-mono); font-size: 13px; color: var(--ink-faint); flex: none; }
+
+    /* dialogs */
+    dialog { border: 0; padding: 0; width: min(560px, calc(100vw - 32px)); background: var(--paper-raised); color: var(--ink); border-radius: var(--radius-sheet); box-shadow: var(--shadow-lift); }
+    dialog::backdrop { background: rgba(30, 27, 23, 0.35); }
+    .dlg { padding: 28px; display: flex; flex-direction: column; gap: 14px; }
+    .dlg dl { margin: 0; display: grid; grid-template-columns: 110px 1fr; gap: 8px 14px; }
+    .dlg dt { color: var(--ink-soft); }
+    .dlg dd { margin: 0; }
+    .dlg pre { margin: 0; white-space: pre-wrap; font: 14px/1.6 var(--font-body); background: var(--paper-sunk); padding: 14px; border-radius: var(--radius-control); max-height: 40vh; overflow: auto; }
+    .dlg label { font-size: 13px; font-weight: 600; }
+    .dlg input[type="text"], .dlg textarea { width: 100%; padding: 10px 12px; border-radius: var(--radius-control); border: 1px solid var(--rule); background: var(--paper); outline: none; }
+    .dlg input[type="text"]:focus, .dlg textarea:focus { box-shadow: 0 0 0 2px var(--ink); }
+    .dlg textarea { min-height: 130px; resize: vertical; font-family: var(--font-mono); font-size: 13px; }
+    .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .seg label { padding: 10px 12px; border: 1px solid var(--rule); border-radius: var(--radius-control); cursor: pointer; font-weight: 500; font-size: 15px; }
+    .seg small { display: block; color: var(--ink-soft); font-weight: 400; }
+    .row-end { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--paper-raised); padding: 10px 16px; border-radius: var(--radius-control); opacity: 0; transition: opacity 240ms var(--ease); pointer-events: none; }
+    .toast.on { opacity: 1; }
+
+    @media (max-width: 1000px) { .cols { grid-template-columns: 1fr; } }
+    @media (max-width: 720px) {
+      .shell { flex-direction: column; }
+      .rail { flex: none; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 16px; border-right: 0; border-bottom: var(--rule-hand); }
+      .nav, .rail .foot { display: none; }
+      .rail .pick { flex: 1; min-width: 160px; }
+      .rail label { display: none; }
+      .page { padding: 24px 16px; }
+      h1 { font-size: 34px; }
+      .col-hide { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail">
+      <a class="brand" href="/">
+        <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.5 C 24 2, 30 8.5, 29.5 16.5 C 29 24, 23 29.8, 15.5 29.5 C 8 29.2, 2.3 23, 2.6 15.5 C 2.9 8, 8.5 3, 16 2.5 Z" fill="var(--ink)"/><path d="M10.5 21.5 L21 11 M13.5 10.8 H21.2 V18.5" stroke="var(--paper)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <b>Arrow</b>
+      </a>
+      <nav class="nav" aria-label="Main"><span>Events<span class="scribble" aria-hidden="true"></span></span></nav>
+      <div class="pick">
+        <label for="picker">Event</label>
+        <select id="picker"></select>
+      </div>
+      <button class="btn btn--quiet" id="new-event" style="align-self:flex-start">+ Create event</button>
+      <div class="foot" id="clock"></div>
+    </aside>
+    <main><div class="page" id="app"></div></main>
+  </div>
+  <dialog id="dlg"><div class="dlg" id="dlg-body"></div></dialog>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    const app = document.getElementById("app");
+    const picker = document.getElementById("picker");
+    const dlg = document.getElementById("dlg");
+    let eventId = new URLSearchParams(location.search).get("event");
+    let data = null;
+    let query = "";
+    let tab = "all";
+    let lastJson = "";
+    // Call-plan edits are visual only: the calls always use the preset questions from the server.
+    const planEdits = {};
+
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const SCRIBBLE = '<span class="scribble" aria-hidden="true"></span>';
+    const STATUS = {
+      answered: ["Answered", "moss"], calling: ["On a call", "indigo"], sms_sent: ["Texted", "ochre"],
+      pending: ["Waiting", "faint"], failed: ["Couldn't reach", "pen"],
+    };
+    const last4 = (p) => (p ? `•••• ${p.slice(-4)}` : "—");
+
+    function toast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("on");
+      clearTimeout(t._h);
+      t._h = setTimeout(() => t.classList.remove("on"), 2600);
+    }
+    async function api(path, opts = {}) {
+      const res = await fetch(`/api${path}`, {
+        method: opts.method ?? (opts.body ? "POST" : "GET"),
+        headers: { "content-type": "application/json" },
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? res.statusText);
+      return json;
+    }
+    const time = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const tickClock = () => (document.getElementById("clock").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZoneName: "short" }));
+    tickClock();
+    setInterval(tickClock, 15000);
+
+    // ---------- events ----------
+    async function loadPicker() {
+      const events = await api("/events");
+      if (!eventId && events.length) eventId = events[0].id;
+      picker.innerHTML = events.map((e) => `<option value="${esc(e.id)}" ${e.id === eventId ? "selected" : ""}>${esc(e.name)}</option>`).join("");
+      if (!events.length) {
+        app.innerHTML = `<h1>Your <em style="color:var(--pen);font-style:italic">events</em></h1><p class="lede">Nothing here yet. Create your first event.</p>`;
+        showCreate();
+      }
+    }
+    picker.addEventListener("change", () => {
+      eventId = picker.value;
+      history.replaceState(null, "", `?event=${eventId}`);
+      lastJson = "";
+      refresh();
+    });
+    document.getElementById("new-event").addEventListener("click", showCreate);
+
+    function showCreate() {
+      openDlg(`
+        <h2>New event</h2>
+        <p class="soft">Arrow calls every guest, asks what they're looking for, and texts each one the person they should meet.</p>
+        <label for="ev-name">Event name</label>
+        <input type="text" id="ev-name" placeholder="[Event name]" />
+        <label for="ev-desc">Description <span class="soft" style="font-weight:400">· the AI reads this on every call</span></label>
+        <textarea id="ev-desc" style="min-height:80px;font-family:var(--font-body);font-size:15px" placeholder="24-hour hackathon for builders working on AI agents."></textarea>
+        <div class="seg">
+          <label><input type="radio" name="type" value="networking" checked /> Networking<small>Role, company, interests, goal</small></label>
+          <label><input type="radio" name="type" value="social" /> Social<small>Hobbies, goal</small></label>
+        </div>
+        <div class="row-end"><button class="btn btn--quiet" data-close>Cancel</button><button class="btn btn--primary" id="ev-go">Create event</button></div>`);
+      document.getElementById("ev-go").addEventListener("click", async () => {
+        const name = document.getElementById("ev-name").value.trim();
+        if (!name) return document.getElementById("ev-name").focus();
+        const ev = await api("/events", {
+          body: { name, description: document.getElementById("ev-desc").value, type: document.querySelector('input[name="type"]:checked').value },
+        });
+        dlg.close();
+        eventId = ev.id;
+        history.replaceState(null, "", `?event=${eventId}`);
+        await loadPicker();
+        lastJson = "";
+        refresh();
+      });
+    }
+
+    // ---------- render ----------
+    function plan() {
+      if (!planEdits[eventId]) planEdits[eventId] = data.questions.map((q) => ({ key: q.key, question: q.question }));
+      return planEdits[eventId];
+    }
+
+    function render() {
+      const { event, people, stats, callsRunning, log } = data;
+      const waiting = stats.pending - stats.calling;
+      const needs = people.filter((p) => ["failed", "sms_sent"].includes(p.status)).length;
+      const tabs = [["all", "All", people.length], ["attention", "Needs attention", needs], ["answered", "Answered", stats.answered], ["matched", "Matched", stats.matched]];
+      const shown = people.filter((p) =>
+        (tab === "all" || (tab === "attention" && ["failed", "sms_sent"].includes(p.status)) || (tab === "answered" && p.status === "answered") || (tab === "matched" && p.matched)) &&
+        (!query || `${p.name} ${p.phone} ${p.position ?? ""} ${p.company ?? ""} ${p.goal ?? ""}`.toLowerCase().includes(query)),
+      );
+      const opening = `Hi! This is the AI assistant for ${event.name}. We find you the person you should meet. Got 60 seconds for ${plan().length} quick questions?`;
+
+      app.innerHTML = `
+        <h1>${esc(event.name)}</h1>
+        ${event.description ? `<p class="lede">${esc(event.description)}</p>` : ""}
+
+        <section class="metrics" aria-label="Progress">
+          <div>
+            <h4>Calls</h4>
+            <div class="row">
+              <span class="metric"><b>${stats.answered}</b> of ${stats.total} answered</span>
+              ${stats.calling ? `<span class="metric"><b>${stats.calling}</b> on a call</span>` : ""}
+              <span class="metric ${stats.sms ? "hot" : ""}"><b>${stats.sms}</b> texted</span>
+              ${waiting ? `<span class="metric"><b>${waiting}</b> waiting</span>` : ""}
+              ${stats.failed ? `<span class="metric hot"><b>${stats.failed}</b> couldn't reach</span>` : ""}
+            </div>
+          </div>
+          <div>
+            <h4>Matches</h4>
+            <div class="row">
+              <span class="metric"><b>${stats.matched}</b> matched</span>
+              <span class="metric"><b>${stats.linksSent}</b> of ${stats.matched} links sent</span>
+            </div>
+          </div>
+        </section>
+
+        <div class="actions">
+          ${callsRunning
+            ? `<button class="btn btn--primary" data-act="stop">Pause calls (${stats.pending} left)</button>`
+            : `<button class="btn btn--primary" data-act="call" ${!stats.pending && !stats.failed ? "disabled" : ""}>Call everyone</button>`}
+          <button class="btn btn--ink" data-act="match" ${stats.answered < 2 ? "disabled" : ""}>${stats.matched ? "Re-run matching" : "Run matching"}</button>
+          <button class="btn btn--outline" data-act="links" ${!stats.matched ? "disabled" : ""}>Text links</button>
+          <button class="btn btn--quiet" data-act="add">+ Add guests</button>
+        </div>
+
+        <div class="cols">
+          <section>
+            <div class="section-head">
+              <h2>Guests</h2>
+              <div class="tabs" role="tablist">
+                ${tabs.map(([k, l, n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l} <b>${n}</b>${tab === k ? SCRIBBLE : ""}</button>`).join("")}
+              </div>
+            </div>
+            <input class="search" id="q" placeholder="Search by name, company, or what they want" value="${esc(query)}" autocomplete="off" aria-label="Search guests" />
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Guest</th><th class="col-hide">Phone</th><th>Call</th><th>Match</th></tr></thead>
+                <tbody>
+                  ${shown.length ? shown.map((p) => {
+                    const [label, cls] = STATUS[p.status] ?? [p.status, "faint"];
+                    return `
+                      <tr data-uid="${esc(p.uid)}" tabindex="0">
+                        <td><div class="who">${esc(p.name || "—")}</div><div class="sub">${esc([p.position, p.company].filter(Boolean).join(" · "))}</div></td>
+                        <td class="col-hide mono soft">${esc(last4(p.phone))}</td>
+                        <td><span class="tag ${cls}">${label}${p.source === "sms" ? " by text" : ""}</span></td>
+                        <td>${p.matched ? `<span class="tag moss">${p.linkSent ? "Link sent" : "Matched"}</span>` : `<span class="tag faint">Not yet</span>`}</td>
+                      </tr>`;
+                  }).join("") : `<tr><td colspan="4" class="empty">${people.length ? "Nobody matches that." : "No guests yet. Add them with a name and phone number."}</td></tr>`}
+                </tbody>
+              </table>
+            </div>
+            <p class="hint"><button class="btn btn--quiet" data-act="csv" style="min-height:0;padding:0">Download CSV</button>${stats.sms ? ` · <button class="btn btn--quiet" data-act="collect" style="min-height:0;padding:0">Check text replies</button>` : ""}</p>
+          </section>
+
+          <aside class="sheet plan" aria-label="Call plan">
+            <h2 style="margin-bottom:8px">Questions</h2>
+            <ol>
+              ${plan().map((q, i) => `
+                <li>
+                  <textarea data-q="${i}" rows="1" aria-label="Question ${i + 1}">${esc(q.question)}</textarea>
+                  <button class="x" data-del="${i}" aria-label="Remove question ${i + 1}">×</button>
+                </li>`).join("")}
+            </ol>
+            <button class="btn btn--quiet" id="add-q" style="padding:0;margin-top:6px">Add question</button>
+            <div class="opening"><span>Opening line</span>${esc(opening)}</div>
+          </aside>
+        </div>
+
+        <section class="log" id="activity">
+          <h2>Activity</h2>
+          <ul>${log.length ? log.slice().reverse().map((l) => `<li><time>${time(l.at)}</time><span>${esc(l.msg)}</span></li>`).join("") : `<li class="soft">Nothing yet.</li>`}</ul>
+        </section>
+      `;
+
+      app.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => act(b.dataset.act, b)));
+      app.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { tab = b.dataset.tab; render(); }));
+      app.querySelectorAll("tbody tr[data-uid]").forEach((r) => {
+        r.addEventListener("click", () => showGuest(r.dataset.uid));
+        r.addEventListener("keydown", (e) => e.key === "Enter" && showGuest(r.dataset.uid));
+      });
+      app.querySelectorAll("[data-q]").forEach((t) => t.addEventListener("input", () => (plan()[t.dataset.q].question = t.value)));
+      app.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => { plan().splice(b.dataset.del, 1); render(); }));
+      document.getElementById("add-q").addEventListener("click", () => {
+        plan().push({ key: null, question: "" });
+        render();
+        app.querySelector(`[data-q="${plan().length - 1}"]`)?.focus();
+      });
+      const q = document.getElementById("q");
+      q.addEventListener("input", () => {
+        query = q.value.toLowerCase();
+        const pos = q.selectionStart;
+        render();
+        const q2 = document.getElementById("q");
+        q2.focus();
+        q2.setSelectionRange(pos, pos);
+      });
+    }
+
+    // ---------- dialogs ----------
+    function openDlg(html) {
+      document.getElementById("dlg-body").innerHTML = html;
+      dlg.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => dlg.close()));
+      dlg.showModal();
+    }
+    dlg.addEventListener("close", () => (lastJson = ""));
+
+    function showGuest(uid) {
+      const p = data.people.find((x) => x.uid === uid);
+      const [label, cls] = STATUS[p.status] ?? [p.status, "faint"];
+      const facts = [["Phone", p.phone], ["Role", p.position], ["Works at", p.company], ["Into", p.interest], ["For fun", p.hobby], ["Looking for", p.goal]].filter(([, v]) => v);
+      openDlg(`
+        <h2>${esc(p.name || p.phone)}</h2>
+        <span class="tag ${cls}">${label}</span>
+        <dl>${facts.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+        ${p.transcript ? `<label>${p.source === "sms" ? "Their text reply" : "Call transcript"}</label><pre>${esc(p.transcript)}</pre>` : ""}
+        <div class="row-end">
+          <button class="btn btn--quiet" id="del">Remove guest</button>
+          ${p.matched ? `<a class="btn btn--outline" href="/m/${esc(p.token)}" target="_blank" rel="noopener">Open their match ↗</a>` : ""}
+          <button class="btn btn--ink" data-close>Done</button>
+        </div>`);
+      document.getElementById("del").addEventListener("click", async () => {
+        if (!confirm(`Remove ${p.name || p.phone}?`)) return;
+        await api(`/people/${uid}`, { method: "DELETE" });
+        dlg.close();
+        refresh();
+      });
+    }
+
+    function showAdd() {
+      openDlg(`
+        <h2>Add guests</h2>
+        <p class="soft">One per line: <b>name, phone</b>. A header row and 10-digit North American numbers are fine.</p>
+        <textarea id="csv" placeholder="Maya Chen, 514 555 0123&#10;Daniel Okafor, +15145550188"></textarea>
+        <div class="row-end"><button class="btn btn--quiet" data-close>Cancel</button><button class="btn btn--primary" id="add-go">Add guests</button></div>`);
+      document.getElementById("add-go").addEventListener("click", async () => {
+        const { added } = await api(`/events/${eventId}/people`, { body: { csv: document.getElementById("csv").value } });
+        dlg.close();
+        toast(`Added ${added} guest${added === 1 ? "" : "s"}`);
+        refresh();
+      });
+    }
+
+    function downloadCsv() {
+      const rows = [["name", "phone", "status", "role", "company", "interest", "goal", "matched"]].concat(
+        data.people.map((p) => [p.name, p.phone, p.status, p.position, p.company, p.interest, p.goal, p.matched ? "yes" : ""]),
+      );
+      const csv = rows.map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: `${data.event.name}.csv` });
+      a.click();
+    }
+
+    async function act(kind, btn) {
+      if (kind === "add") return showAdd();
+      if (kind === "csv") return downloadCsv();
+      const ask = {
+        call: `Call ${data.stats.pending + data.stats.failed} guests now, one at a time? Each call uses Dial credit.`,
+        links: `Text each of the ${data.stats.matched} matched guests their match link?`,
+      }[kind];
+      if (ask && !confirm(ask)) return;
+      btn.disabled = true;
+      try {
+        const r = await api(`/events/${eventId}/${{ call: "call", stop: "stop", collect: "collect", match: "match", links: "send-links" }[kind]}`, { body: {} });
+        toast(
+          kind === "call" ? `Calling ${r.queued} guests` :
+          kind === "stop" ? "Pausing after the current call" :
+          kind === "collect" ? `${r.collected} new replies` :
+          kind === "match" ? `Matched ${r.people} guests (${r.mutual} mutual)` : `Sent ${r.sent} links`,
+        );
+      } catch (e) {
+        toast(e.message);
+      }
+      lastJson = "";
+      refresh();
+    }
+
+    async function refresh() {
+      if (!eventId) return;
+      try {
+        const next = await api(`/events/${eventId}`);
+        data = next;
+        const json = JSON.stringify(next);
+        // don't redraw under an open dialog or while typing in search or the call plan
+        const typing = document.activeElement?.id === "q" || document.activeElement?.dataset?.q !== undefined;
+        if (json !== lastJson && !dlg.open && !typing) {
+          lastJson = json;
+          render();
+        }
+      } catch (e) {
+        app.innerHTML = `<p class="empty">${esc(e.message)}</p>`;
+      }
+    }
+
+    (async () => {
+      await loadPicker();
+      await refresh();
+      setInterval(refresh, 3000);
+    })();
+  </script>
+</body>
+</html>

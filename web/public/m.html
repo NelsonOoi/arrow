@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0c0b10" />
+  <title>Your people · Arrow</title>
+  <link rel="icon" href="/arrow.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    /* the guest page is always dark: it's used in dim rooms and the beacon needs contrast */
+    :root { --bg: #0c0b10; --surface: #16151c; --surface-2: #1f1e27; --text: #f3f2f7; --muted: #9b98a6; --line: #2a2933; color-scheme: dark; }
+
+    main { max-width: 460px; margin: 0 auto; padding: calc(16px + env(safe-area-inset-top)) 16px 48px; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
+    .event { font-size: 13px; color: var(--muted); text-align: right; max-width: 60%; }
+    .hello { margin-bottom: 24px; }
+    .hello h1 { font-size: 32px; line-height: 1.1; }
+    .hello p { margin: 8px 0 24px; color: var(--muted); }
+
+    .incoming {
+      display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: 16px;
+      border-radius: var(--radius); color: #0c0b10; font-weight: 600; cursor: pointer; border: 0; width: 100%; text-align: left;
+      animation: glow 1.6s ease-in-out infinite;
+    }
+    .incoming .dot { width: 12px; height: 12px; border-radius: 50%; background: #0c0b10; animation: blink 0.8s steps(2) infinite; }
+    @keyframes blink { 50% { opacity: 0.2; } }
+    @keyframes glow { 50% { filter: brightness(1.15); } }
+
+    .must {
+      position: relative; padding: 22px 20px 20px; margin-bottom: 14px; overflow: hidden;
+      background: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%), var(--surface);
+      border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+    }
+    .must .tag {
+      display: inline-flex; gap: 6px; align-items: center; margin-bottom: 16px;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent);
+    }
+    .who { display: flex; gap: 14px; align-items: center; }
+    .who h2 { font-size: 24px; line-height: 1.15; }
+    .who .role { color: var(--muted); font-size: 14px; }
+    .reason { margin: 16px 0 0; font-size: 16px; line-height: 1.45; }
+    .facts { margin: 14px 0 18px; display: grid; gap: 8px; font-size: 13px; }
+    .facts div { display: grid; grid-template-columns: 92px 1fr; gap: 8px; }
+    .facts dt { color: var(--muted); }
+    .facts dd { margin: 0; }
+
+
+
+    .empty { text-align: center; padding: 48px 20px; }
+    .empty svg { width: 56px; height: 56px; margin-bottom: 16px; color: var(--accent); animation: spin 6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    footer { margin-top: 28px; text-align: center; font-size: 12px; color: var(--muted); }
+
+    /* --- beacon: the whole screen becomes a colored sign --- */
+    .beacon {
+      position: fixed; inset: 0; z-index: 10; display: none; flex-direction: column;
+      padding: calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
+      color: #0c0b10; text-align: center;
+    }
+    .beacon.on { display: flex; animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 50% { filter: brightness(1.25) saturate(1.1); } }
+    .beacon .top { font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-size: 12px; opacity: 0.75; }
+    .beacon .mid { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+    .beacon .big { font: 700 44px/1.02 var(--display); letter-spacing: -0.03em; }
+    .beacon .hint { font-size: 17px; font-weight: 500; max-width: 320px; margin: 0 auto; }
+    .beacon .ice { margin: 8px auto 0; max-width: 320px; padding: 12px 16px; border-radius: 14px; background: rgb(0 0 0 / 0.12); font-size: 14px; }
+    .beacon .btn { background: #0c0b10; color: #fff; }
+    .beacon .btn.ghost { background: rgb(0 0 0 / 0.14); color: #0c0b10; margin-top: 10px; }
+    .arrowup { width: 54px; height: 54px; margin: 0 auto; animation: up 1.2s ease-in-out infinite; }
+    @keyframes up { 50% { transform: translateY(-10px); } }
+    @media (prefers-reduced-motion: reduce) { .beacon.on, .arrowup, .incoming, .empty svg { animation: none; } }
+  </style>
+</head>
+<body>
+  <main id="app" aria-live="polite"></main>
+
+  <section class="beacon" id="beacon" role="dialog" aria-modal="true" aria-labelledby="beacon-name">
+    <div class="top" id="beacon-top"></div>
+    <div class="mid">
+      <svg class="arrowup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      <div class="big" id="beacon-name"></div>
+      <div class="hint" id="beacon-hint"></div>
+      <div class="ice" id="beacon-ice" hidden></div>
+    </div>
+    <button class="btn block" id="found">We found each other ✓</button>
+    <button class="btn block ghost" id="cancel">Not now</button>
+  </section>
+
+  <script>
+    const token = location.pathname.split("/").filter(Boolean)[1];
+    const app = document.getElementById("app");
+    const beaconEl = document.getElementById("beacon");
+    let state = null;
+    let beacon = null; // {id, color, name, uid, mode: 'out'|'in'}
+    let dismissed = new Set(); // incoming beacon ids the guest said "not now" to
+
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const initials = (n) => (n ?? "?").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+    const hue = (s) => [...(s ?? "")].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+    const avatar = (p, size = "") =>
+      `<div class="avatar ${size}" style="background:linear-gradient(135deg,hsl(${hue(p.name)} 70% 55%),hsl(${(hue(p.name) + 40) % 360} 70% 42%))" aria-hidden="true">${esc(initials(p.name))}</div>`;
+    const first = (n) => (n ?? "").split(" ")[0];
+    const role = (p) => [p.position, p.company].filter(Boolean).map(esc).join(" · ") || esc(p.hobby ?? "");
+    const icon = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 5l4 10-4-2.5L8 15l4-10z" fill="currentColor"/></svg>`;
+
+    async function api(path, body) {
+      const res = await fetch(`/api/m/${token}${path}`, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {});
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Something went wrong");
+      return json;
+    }
+
+    function render() {
+      const { me, event, matches, incoming } = state;
+      const [top] = matches;
+      const showIncoming = incoming && !dismissed.has(incoming.id) && !(beacon && beacon.id === incoming.id);
+
+      app.innerHTML = `
+        <header>
+          <span class="brand">${icon}Arrow</span>
+          <span class="event">${esc(event.name)}</span>
+        </header>
+
+        ${showIncoming ? `
+          <button class="incoming" id="incoming" style="background:${incoming.color}">
+            <span class="dot"></span>
+            <span>${esc(first(incoming.from.name))} is looking for you. Tap to light up your screen.</span>
+          </button>` : ""}
+
+        ${!matches.length ? `
+          <div class="empty">
+            ${icon}
+            <h1>Matching in progress</h1>
+            <p class="muted">Hang tight, ${esc(first(me.name))}. We'll text you as soon as your people are ready.</p>
+          </div>` : `
+          <section class="hello">
+            <h1>${esc(first(me.name))}, meet ${esc(first(top.name))}.</h1>
+          </section>
+
+          ${card(top)}
+        `}
+
+        <footer>Your answers are only used to match you at this event.</footer>
+      `;
+
+      app.querySelectorAll("[data-find]").forEach((b) => b.addEventListener("click", () => startFind(b.dataset.find)));
+      document.getElementById("incoming")?.addEventListener("click", () => {
+        const m = matches.find((x) => x.uid === incoming.from.uid) ?? { uid: incoming.from.uid, name: incoming.from.name };
+        showBeacon({ id: incoming.id, color: incoming.color, name: m.name, uid: m.uid, interest: m.interest, mode: "in" });
+      });
+    }
+
+    function card(m) {
+      const facts = [
+        m.goal && ["Looking for", m.goal],
+        m.interest && ["Into", m.interest],
+        m.hobby && ["For fun", m.hobby],
+      ].filter(Boolean);
+      return `
+        <article class="card must">
+          ${m.mustMeet ? `<div class="tag">★ It's mutual: ${esc(first(m.name))} wants to meet you too</div>` : ""}
+          <div class="who">
+            ${avatar(m, "lg")}
+            <div><h2>${esc(m.name)}</h2><div class="role">${role(m)}</div></div>
+          </div>
+          ${m.reason ? `<p class="reason">${esc(m.reason)}</p>` : ""}
+          <dl class="facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>
+          <button class="btn block" data-find="${esc(m.uid)}">Find ${esc(first(m.name))}</button>
+        </article>`;
+    }
+
+    async function startFind(uid) {
+      const m = state.matches.find((x) => x.uid === uid);
+      try {
+        const b = await api("/find", { uid });
+        showBeacon({ ...b, name: m.name, uid, interest: m.interest, mode: "out" });
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    function showBeacon(b) {
+      beacon = b;
+      beaconEl.style.background = b.color;
+      document.querySelector('meta[name="theme-color"]').content = b.color;
+      document.getElementById("beacon-top").textContent = b.mode === "out" ? "Finding" : "Looking for you";
+      document.getElementById("beacon-name").textContent = b.name;
+      document.getElementById("beacon-hint").textContent =
+        b.mode === "out"
+          ? `Hold your phone up. ${first(b.name)}'s screen is flashing this same color.`
+          : `Hold your phone up so ${first(b.name)} can spot this color.`;
+      const ice = document.getElementById("beacon-ice");
+      ice.hidden = !b.interest;
+      ice.textContent = b.interest ? `Opener: ask about ${b.interest.toLowerCase()}` : "";
+      beaconEl.classList.add("on");
+      navigator.vibrate?.([200, 100, 200, 100, 400]);
+    }
+
+    function hideBeacon() {
+      beaconEl.classList.remove("on");
+      document.querySelector('meta[name="theme-color"]').content = "#0c0b10";
+      beacon = null;
+      lastJson = ""; // force the next poll to redraw
+    }
+
+    document.getElementById("found").addEventListener("click", async () => {
+      if (beacon) await api("/found", { id: beacon.id }).catch(() => {});
+      hideBeacon();
+    });
+    document.getElementById("cancel").addEventListener("click", () => {
+      if (beacon?.mode === "in") dismissed.add(beacon.id);
+      else if (beacon) api("/found", { id: beacon.id }).catch(() => {});
+      hideBeacon();
+    });
+
+    let lastJson = "";
+    async function poll() {
+      try {
+        const next = await api("");
+        const json = JSON.stringify(next);
+        const changed = json !== lastJson;
+        lastJson = json;
+        state = next;
+        // the other side tapped "found" → close our beacon too
+        if (beacon && ![state.incoming?.id, state.outgoing?.id].includes(beacon.id)) hideBeacon();
+        // they started looking for us while we look for them → same color on both
+        if (beacon?.mode === "out" && state.incoming && state.incoming.from.uid === beacon.uid && state.incoming.color !== beacon.color) showBeacon({ ...beacon, ...state.incoming, mode: "out" });
+        // someone is looking for us → take over the screen (unless we said "not now")
+        if (!beacon && state.incoming && !dismissed.has(state.incoming.id)) {
+          const inc = state.incoming;
+          const m = state.matches.find((x) => x.uid === inc.from.uid);
+          showBeacon({ id: inc.id, color: inc.color, name: inc.from.name, uid: inc.from.uid, interest: m?.interest, mode: "in" });
+        }
+        if (!beacon && changed) render(); // re-rendering unchanged DOM can swallow taps
+      } catch (e) {
+        app.innerHTML = `<div class="empty">${icon}<h1>Link not found</h1><p class="muted">${esc(e.message)}. Check the text we sent you.</p></div>`;
+        return;
+      }
+      setTimeout(poll, 2500);
+    }
+    poll();
+  </script>
+</body>
+</html>
