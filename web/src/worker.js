@@ -276,7 +276,7 @@ route("GET", "/api/gatherings/:id", async (req, env, { id }) => {
     event,
     questions: questionsFor(event),
     people: list.map((p) => ({
-      ...profile(p), phone: p.phone, status: p.status, source: p.source, token: p.token, transcript: p.transcript,
+      ...profile(p), phone: p.phone, status: p.status, source: p.source, token: p.token, answers: p.answers, transcript: p.transcript,
       matched: matchedSet.has(p.uid), linkSent: !!p.link_sent_at, createdAt: p.created_at,
     })),
     stats: {
