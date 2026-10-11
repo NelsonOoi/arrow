@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Arrow for hosts</title>
   <link rel="icon" href="/arrow.svg" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
@@ -157,6 +158,15 @@
     /* dialogs */
     dialog { border: 0; padding: 0; width: min(560px, calc(100vw - 32px)); background: var(--paper-raised); color: var(--ink); border-radius: var(--radius-sheet); box-shadow: var(--shadow-lift); }
     dialog::backdrop { background: rgba(30, 27, 23, 0.35); }
+    dialog.wide { width: min(1100px, calc(100vw - 32px)); }
+    .qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 24px; max-height: 70vh; overflow: auto; }
+    .qr-grid figure { margin: 0; text-align: center; }
+    .qr-grid img { width: 100%; max-width: 220px; aspect-ratio: 1; image-rendering: pixelated; background: #fff; border-radius: 12px; }
+    .qr-grid figcaption { font-weight: 600; margin-top: 6px; font-size: 17px; }
+    .qr-one { display: flex; gap: 16px; align-items: center; padding: 12px; background: var(--paper); border-radius: var(--radius-control); }
+    .qr-one img { background: #fff; border-radius: 8px; image-rendering: pixelated; flex: none; }
+    .qr-one div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .qr-one .mono { font-size: 12px; color: var(--ink-soft); word-break: break-all; }
     .dlg { padding: 28px; display: flex; flex-direction: column; gap: 14px; }
     .dlg dl { margin: 0; display: grid; grid-template-columns: 110px 1fr; gap: 8px 14px; }
     .dlg dt { color: var(--ink-soft); }
@@ -353,15 +363,6 @@
     function render() {
       const { event, people, stats, callsRunning, log } = data;
       const waiting = stats.pending - stats.calling;
-      // Matchmaker handoff (MATCHER=matchmaker): requested → running → done | failed
-      const mm = event.mm_status;
-      const matching = mm === "requested" || mm === "running";
-      const stale = mm === "requested" && Date.now() - Date.parse(event.mm_requested_at) > 30000;
-      const mmLine =
-        stale ? `Waiting for the matchmaker to pick this up…` :
-        mm === "requested" ? "Sent to the matchmaker…" :
-        mm === "running" ? (event.mm_total ? `Jev scored ${event.mm_done} of ${event.mm_total} pairs` : "Matchmaker is starting…") :
-        mm === "failed" ? `Matchmaker failed: ${event.mm_error ?? "unknown error"}` : "";
       const needs = people.filter((p) => ["failed", "sms_sent"].includes(p.status)).length;
       const tabs = [["all", "All", people.length], ["attention", "Needs attention", needs], ["answered", "Answered", stats.answered], ["matched", "Matched", stats.matched]];
       const shown = people.filter((p) =>
@@ -392,7 +393,6 @@
               <span class="metric"><b>${stats.matched}</b> matched</span>
               <span class="metric"><b>${stats.linksSent}</b> of ${stats.matched} links sent</span>
             </div>
-            ${mmLine ? `<p class="hint" ${mm === "failed" || stale ? 'style="color:var(--pen)"' : ""}>${esc(mmLine)}</p>` : ""}
           </div>
         </section>
 
@@ -400,7 +400,8 @@
           ${callsRunning
             ? `<button class="btn btn--primary" data-act="stop">Pause calls (${stats.pending} left)</button>`
             : `<button class="btn btn--primary" data-act="call" ${!stats.pending && !stats.failed ? "disabled" : ""}>Call everyone</button>`}
-          <button class="btn btn--ink" data-act="match" ${stats.answered < 2 || matching ? "disabled" : ""}>${matching ? "Matching…" : stats.matched ? "Re-run matching" : "Run matching"}</button>
+          <button class="btn btn--ink" data-act="match" ${stats.answered < 2 ? "disabled" : ""}>${stats.matched ? "Re-run matching" : "Run matching"}</button>
+          <button class="btn btn--outline" data-act="qr" ${!stats.matched ? "disabled" : ""}>Show QR codes</button>
           <button class="btn btn--outline" data-act="links" ${!stats.matched ? "disabled" : ""}>Text links</button>
           <button class="btn btn--quiet" data-act="add">+ Add guests</button>
         </div>
@@ -488,6 +489,25 @@
     }
     dlg.addEventListener("close", () => (lastJson = ""));
 
+    const matchUrl = (p) => `${location.origin}/m/${p.token}`;
+    function qrSrc(text) {
+      const q = qrcode(0, "M");
+      q.addData(text);
+      q.make();
+      return q.createDataURL(6, 2);
+    }
+    function showQrSheet() {
+      const matched = data.people.filter((p) => p.matched);
+      openDlg(`
+        <h2>Scan to see your match</h2>
+        <div class="qr-grid">${matched.map((p) => `
+          <figure><img src="${qrSrc(matchUrl(p))}" alt="QR code for ${esc(p.name)}'s match page"><figcaption>${esc(p.name)}</figcaption></figure>`).join("")}
+        </div>
+        <div class="row-end"><button class="btn btn--ink" data-close>Done</button></div>`);
+      dlg.classList.add("wide");
+      dlg.addEventListener("close", () => dlg.classList.remove("wide"), { once: true });
+    }
+
     function showGuest(uid) {
       const p = data.people.find((x) => x.uid === uid);
       const [label, cls] = STATUS[p.status] ?? [p.status, "faint"];
@@ -496,6 +516,7 @@
         <h2>${esc(p.name || p.phone)}</h2>
         <span class="tag ${cls}">${label}</span>
         <dl>${facts.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+        ${p.matched ? `<div class="qr-one"><img src="${qrSrc(matchUrl(p))}" alt="QR code for ${esc(p.name)}'s match page" width="160" height="160"><div><b>Scan to open their match</b><span class="mono">${esc(matchUrl(p).replace(/^https?:\/\//, ""))}</span></div></div>` : ""}
         ${p.transcript ? `<label>${p.source === "sms" ? "Their text reply" : "Call transcript"}</label><pre>${esc(p.transcript)}</pre>` : ""}
         <div class="row-end">
           <button class="btn btn--quiet" id="del">Remove guest</button>
@@ -536,6 +557,7 @@
     async function act(kind, btn) {
       if (kind === "add") return showAdd();
       if (kind === "csv") return downloadCsv();
+      if (kind === "qr") return showQrSheet();
       const ask = {
         call: `Call ${data.stats.pending + data.stats.failed} guests now, one at a time? Each call uses Dial credit.`,
         links: `Text each of the ${data.stats.matched} matched guests their match link?`,
@@ -548,7 +570,7 @@
           kind === "call" ? `Calling ${r.queued} guests` :
           kind === "stop" ? "Pausing after the current call" :
           kind === "collect" ? `${r.collected} new replies` :
-          kind === "match" ? (r.queued ? `Sent ${r.queued} guests to the matchmaker` : `Matched ${r.people} guests (${r.mutual} mutual)`) : `Sent ${r.sent} links`,
+          kind === "match" ? `Matched ${r.people} guests (${r.mutual} mutual)` : `Sent ${r.sent} links`,
         );
       } catch (e) {
         toast(e.message);
