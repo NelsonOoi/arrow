@@ -352,15 +352,6 @@
     function render() {
       const { event, people, stats, callsRunning, log } = data;
       const waiting = stats.pending - stats.calling;
-      // Matchmaker handoff (MATCHER=matchmaker): requested → running → done | failed
-      const mm = event.mm_status;
-      const matching = mm === "requested" || mm === "running";
-      const stale = mm === "requested" && Date.now() - Date.parse(event.mm_requested_at) > 30000;
-      const mmLine =
-        stale ? `Waiting for the matchmaker to pick this up…` :
-        mm === "requested" ? "Sent to the matchmaker…" :
-        mm === "running" ? (event.mm_total ? `Jev scored ${event.mm_done} of ${event.mm_total} pairs` : "Matchmaker is starting…") :
-        mm === "failed" ? `Matchmaker failed: ${event.mm_error ?? "unknown error"}` : "";
       const needs = people.filter((p) => ["failed", "sms_sent"].includes(p.status)).length;
       const tabs = [["all", "All", people.length], ["attention", "Needs attention", needs], ["answered", "Answered", stats.answered], ["matched", "Matched", stats.matched]];
       const shown = people.filter((p) =>
@@ -391,7 +382,6 @@
               <span class="metric"><b>${stats.matched}</b> matched</span>
               <span class="metric"><b>${stats.linksSent}</b> of ${stats.matched} links sent</span>
             </div>
-            ${mmLine ? `<p class="hint" ${mm === "failed" || stale ? 'style="color:var(--pen)"' : ""}>${esc(mmLine)}</p>` : ""}
           </div>
         </section>
 
@@ -399,7 +389,7 @@
           ${callsRunning
             ? `<button class="btn btn--primary" data-act="stop">Pause calls (${stats.pending} left)</button>`
             : `<button class="btn btn--primary" data-act="call" ${!stats.pending && !stats.failed ? "disabled" : ""}>Call everyone</button>`}
-          <button class="btn btn--ink" data-act="match" ${stats.answered < 2 || matching ? "disabled" : ""}>${matching ? "Matching…" : stats.matched ? "Re-run matching" : "Run matching"}</button>
+          <button class="btn btn--ink" data-act="match" ${stats.answered < 2 ? "disabled" : ""}>${stats.matched ? "Re-run matching" : "Run matching"}</button>
           <button class="btn btn--outline" data-act="links" ${!stats.matched ? "disabled" : ""}>Text links</button>
           <button class="btn btn--quiet" data-act="add">+ Add guests</button>
         </div>
@@ -546,7 +536,7 @@
           kind === "call" ? `Calling ${r.queued} guests` :
           kind === "stop" ? "Pausing after the current call" :
           kind === "collect" ? `${r.collected} new replies` :
-          kind === "match" ? (r.queued ? `Sent ${r.queued} guests to the matchmaker` : `Matched ${r.people} guests (${r.mutual} mutual)`) : `Sent ${r.sent} links`,
+          kind === "match" ? `Matched ${r.people} guests (${r.mutual} mutual)` : `Sent ${r.sent} links`,
         );
       } catch (e) {
         toast(e.message);

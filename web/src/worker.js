@@ -1,9 +1,6 @@
-// Arrow's JSON API under /api, run on Vercel by server.js (events live at /api/gatherings: ad blockers
-// block anything under /api/events as analytics). The pages in public/ (host dashboard at /, guest page at
-// /m/<token>) are served statically. Data in Supabase, calls and texts through Dial, matching by the Python
-// matchmaker (or Jev directly in match.js).
-import { generateText, Output } from "ai";
-import { z } from "zod";
+// Arrow on Cloudflare Workers: host dashboard at /, guest page at /m/<token>,
+// JSON API under /api (events live at /api/gatherings: ad blockers block anything under
+// /api/events as analytics). Data in Supabase, calls and texts through Dial, scoring by Jev.
 import { placeCall, getCall, sendSms, listMessages } from "./dial.js";
 import { computeMatches, profile } from "./match.js";
 import { select, first as firstRow, insert, update, remove, v, inList } from "./db.js";
@@ -11,7 +8,7 @@ import { isDemo, demoCall, demoCallStatus, answersFor, transcriptFor, smsReplyFo
 
 const BEACON_COLORS = ["#FF5A36", "#2EE59D", "#3D7BFF", "#FFC531", "#E040FB", "#00D4FF"];
 const BEACON_TTL_MIN = 10;
-const MAX_CALL_SECONDS = 150;
+const MAX_CALL_SECONDS = 240; // phone screening can eat a minute
 
 const QUESTIONS = {
   networking: [
@@ -78,88 +75,155 @@ Keep the whole call under 2 minutes. Never ask for email, address, or anything n
 const smsQuestions = (event, person) =>
   `Hi${first(person.name)}! We tried calling for ${event.name} — we find you the person you should meet there. Reply with quick answers:\n${questionsFor(event).map((q, i) => `${i + 1}) ${q.question}`).join("\n")}`;
 
-// A small model on Vercel AI Gateway pulls short answers out of a call transcript or SMS reply.
-// Auth: Vercel OIDC on deployments, AI_GATEWAY_API_KEY elsewhere. Without either, answers stay empty.
-const EXTRACT_MODEL = "anthropic/claude-haiku-5.5"; // override with AI_GATEWAY_MODEL
-const hasGateway = (env) => !!(env.VERCEL || env.AI_GATEWAY_API_KEY || env.VERCEL_OIDC_TOKEN);
+// Which agent question a transcript line is asking, by keyword.
+const CUES = {
+  position: /role|position/i,
+  company: /where do you (work|study)|work or study|company/i,
+  interest: /interested in|working on/i,
+  hobby: /for fun|hobb/i,
+  goal: /looking for|perfect person|want to meet/i,
+};
 
+// No-AI fallback: read the guest's reply after each question straight from the text.
+function parseAnswers(qs, text) {
+  const out = Object.fromEntries(qs.map((q) => [q.key, null]));
+  const lines = String(text ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const turns = [];
+  for (const l of lines) {
+    const m = l.match(/^(Agent|User|Guest|Caller)\s*:\s*(.*)$/i);
+    if (m) turns.push({ agent: /^agent$/i.test(m[1]), text: m[2] });
+    else if (turns.length) turns[turns.length - 1].text += " " + l;
+  }
+  if (!turns.length) {
+    // an SMS reply: "1) ...", "2) ..." or one answer per line
+    const numbered = lines.map((l) => l.match(/^\s*(\d)\s*[).:-]\s*(.+)$/)).filter(Boolean);
+    if (numbered.length) for (const [, n, a] of numbered) { const q = qs[Number(n) - 1]; if (q) out[q.key] = a.trim(); }
+    else if (lines.length === qs.length) qs.forEach((q, i) => (out[q.key] = lines[i]));
+    return out;
+  }
+  let from = 0;
+  for (const q of qs) {
+    const cue = CUES[q.key];
+    const ask = turns.findIndex((t, i) => i >= from && t.agent && cue?.test(t.text));
+    if (ask < 0) continue;
+    const reply = [];
+    for (let i = ask + 1; i < turns.length && !turns[i].agent; i++) reply.push(turns[i].text);
+    const answer = reply.join(" ").replace(/\(unintelligible audio\)/gi, "").trim();
+    if (answer) out[q.key] = answer;
+    from = ask + 1;
+  }
+  return out;
+}
+
+// Pull short answers out of a call transcript or SMS reply: Workers AI first,
+// with any gaps filled by parseAnswers.
 async function extractAnswers(env, event, text) {
   const qs = questionsFor(event);
-  const empty = qs.map((q) => ({ key: q.key, question: q.question, answer: null }));
-  if (!text || !hasGateway(env)) return empty;
-  try {
-    const { output } = await generateText({
-      model: env.AI_GATEWAY_MODEL || EXTRACT_MODEL,
-      instructions: "You extract answers from event-guest intake conversations.",
-      prompt: `Questions:\n${qs.map((q) => `- ${q.key}: ${q.question}`).join("\n")}\n\nConversation:\n"""\n${text.slice(0, 6000)}\n"""\n\nGive each answer as a short phrase in the guest's own words, or null if they didn't answer.`,
-      output: Output.object({ schema: z.object(Object.fromEntries(qs.map((q) => [q.key, z.string().nullable()]))) }),
-      maxOutputTokens: 300,
-    });
-    return qs.map((q) => ({ key: q.key, question: q.question, answer: output[q.key] ?? null }));
-  } catch (e) {
-    console.warn("extraction failed", e.message);
-    return empty;
+  const parsed = parseAnswers(qs, text);
+  let ai = {};
+  if (text && env.AI) {
+    try {
+      const out = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+        messages: [
+          { role: "system", content: "You extract a guest's answers from an event intake phone call or text reply. Use the guest's own words, shortened to a phrase. Use null if they never answered that question." },
+          { role: "user", content: `Questions:\n${qs.map((q) => `- ${q.key}: ${q.question}`).join("\n")}\n\nConversation:\n"""\n${text.slice(0, 8000)}\n"""` },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: { type: "object", properties: Object.fromEntries(qs.map((q) => [q.key, { type: ["string", "null"] }])), required: qs.map((q) => q.key) },
+        },
+        max_tokens: 400,
+      });
+      const r = out.response;
+      ai = typeof r === "string" ? JSON.parse(r.slice(r.indexOf("{"), r.lastIndexOf("}") + 1)) : r ?? {};
+    } catch (e) {
+      console.warn("AI extraction failed, using parser", e.message);
+    }
   }
+  const clean = (v) => (typeof v === "string" && v.trim() && !/^(null|none|n\/a)$/i.test(v.trim()) ? v.trim() : null);
+  return qs.map((q) => ({ key: q.key, question: q.question, answer: clean(ai[q.key]) ?? clean(parsed[q.key]) }));
 }
+const noAnswers = (answers) => answers.every((a) => !a.answer);
 
 // ---------- call queue ----------
 // Dial numbers carry one call at a time, so calls run one by one. Each dashboard
-// poll calls tick(): finish the call in progress, then start the next one.
+// poll calls tick(): finish the call in progress, then start the next one. Several
+// pollers can tick at once, so every state change is a conditional update and only
+// the poller whose update lands acts on it.
 async function tick(env, event) {
   const say = log(env, event.id);
   const calling = await firstRow(env, `people?event_id=eq.${v(event.id)}&status=eq.calling`);
   if (calling) {
-    if (!calling.call_id) return;
+    // claimed but not dialed yet (or a stale claim from a crashed poll)
+    if (!calling.call_id || calling.call_id.startsWith("claim_")) {
+      const age = calling.call_id ? Date.now() - Number(calling.call_id.split("_")[1]) : Infinity;
+      if (age > 60000) await update(env, `people?uid=eq.${v(calling.uid)}&status=eq.calling`, { status: "pending", call_id: null });
+      return;
+    }
+    let outcome; // { transcript, answers, secs } or { miss }
     if (calling.call_id.startsWith("demo_")) {
       const sim = demoCallStatus(calling.call_id);
       if (sim.status.state !== "Terminated") return;
       const answers = answersFor(questionsFor(event), calling.uid);
-      await setPerson(env, calling.uid, { status: "answered", source: "call", transcript: transcriptFor(event, calling, answers), answers });
-      await say(`✓ ${calling.name} answered (${sim.duration}s, demo call)`);
+      outcome = { transcript: transcriptFor(event, calling, answers), answers, secs: sim.duration, demo: true };
     } else {
-    const call = await getCall(env, calling.call_id);
-    if (call.status?.state !== "Terminated") return;
-    const term = call.status?.terminationType;
-    // roughly when the call ended: placed + ring time + talk time
-    const endedSecsAgo = (Date.now() - Date.parse(call.createdAt)) / 1000 - (call.duration ?? 0) - 30;
-    if (term === "completed" && !call.transcript && endedSecsAgo < 180) return; // transcript usually lands seconds after hang-up; allow up to 3 min
-    if (term === "completed" && call.transcript && (call.duration ?? 0) > 20) {
-      await setPerson(env, calling.uid, { status: "answered", source: "call", transcript: call.transcript, answers: await extractAnswers(env, event, call.transcript) });
-      await say(`✓ ${calling.name} answered (${call.duration}s)`);
-    } else {
-      await textQuestions(env, event, calling, `${term ?? "no answer"}`);
+      const call = await getCall(env, calling.call_id);
+      if (call.status?.state !== "Terminated") return;
+      const term = call.status?.terminationType;
+      // roughly when the call ended: placed + ring time + talk time
+      const endedSecsAgo = (Date.now() - Date.parse(call.createdAt)) / 1000 - (call.duration ?? 0) - 30;
+      if (term === "completed" && !call.transcript && endedSecsAgo < 180) return; // transcript usually lands seconds after hang-up
+      if (term === "completed" && call.transcript) {
+        const answers = await extractAnswers(env, event, call.transcript);
+        outcome = noAnswers(answers) ? { miss: "picked up but no answers (voicemail?)", transcript: call.transcript } : { transcript: call.transcript, answers, secs: call.duration };
+      } else outcome = { miss: term ?? "no answer" };
     }
-    }
+    const fields = outcome.answers
+      ? { status: "answered", source: "call", transcript: outcome.transcript, answers: outcome.answers }
+      : { status: "sms_sent", source: "sms", sms_sent_at: new Date().toISOString(), ...(outcome.transcript ? { transcript: outcome.transcript } : {}) };
+    const won = await update(env, `people?uid=eq.${v(calling.uid)}&status=eq.calling&call_id=eq.${v(calling.call_id)}`, fields);
+    if (!won.length) return; // another poll already handled this call
+    if (outcome.answers) await say(`✓ ${calling.name} answered (${outcome.secs}s${outcome.demo ? ", demo call" : ""})`);
+    else await sendQuestionsText(env, event, calling, outcome.miss);
   }
   if (!event.calls_on) return;
   const next = await firstRow(env, `people?event_id=eq.${v(event.id)}&status=eq.pending&order=created_at`);
   if (!next) {
-    await update(env, `events?id=eq.${v(event.id)}`, { calls_on: false });
-    await say("Calls finished");
+    const off = await update(env, `events?id=eq.${v(event.id)}&calls_on=eq.true`, { calls_on: false });
+    if (off.length) await say("Calls finished");
     return;
   }
-  // claim the row first so two overlapping polls can't both dial
-  const claimed = await update(env, `people?uid=eq.${v(next.uid)}&status=eq.pending`, { status: "calling" });
+  // claim the guest, then make sure we're the only claim: the earliest claim wins
+  const claim = `claim_${Date.now()}_${next.uid}`;
+  const claimed = await update(env, `people?uid=eq.${v(next.uid)}&status=eq.pending`, { status: "calling", call_id: claim });
   if (!claimed.length) return;
+  const active = await select(env, `people?event_id=eq.${v(event.id)}&status=eq.calling&select=uid,call_id`);
+  const winner = active.some((a) => a.call_id && !a.call_id.startsWith("claim_")) ? null : active.map((a) => a.call_id).sort()[0];
+  if (winner !== claim) {
+    await update(env, `people?uid=eq.${v(next.uid)}&call_id=eq.${v(claim)}`, { status: "pending", call_id: null });
+    return;
+  }
   await say(`Calling ${next.name} (${next.phone})${isDemo(env) ? " · demo mode, no Dial key: simulated call" : ""}`);
   try {
     const call = isDemo(env) ? demoCall(next.uid) : await placeCall(env, { to: next.phone, instruction: callInstruction(event, next), idempotencyKey: `${event.id}-${next.uid}`, maxSeconds: MAX_CALL_SECONDS });
     await setPerson(env, next.uid, { call_id: call.id });
   } catch (e) {
-    await textQuestions(env, event, next, `call failed: ${e.message}`);
+    await update(env, `people?uid=eq.${v(next.uid)}`, { status: "sms_sent", source: "sms", sms_sent_at: new Date().toISOString() });
+    await sendQuestionsText(env, event, next, `call failed: ${e.message}`);
   }
 }
 
-async function textQuestions(env, event, person, why) {
+// The guest is already marked as texted; send the questions (or mark them unreachable).
+async function sendQuestionsText(env, event, person, why) {
   try {
     if (!isDemo(env)) await sendSms(env, person.phone, smsQuestions(event, person));
-    await setPerson(env, person.uid, { status: "sms_sent", source: "sms", sms_sent_at: new Date().toISOString() });
     await log(env, event.id)(`${person.name}: ${why} → texted the questions`);
   } catch (e) {
     await setPerson(env, person.uid, { status: "failed" });
     await log(env, event.id)(`✗ ${person.name}: ${why}; text failed too (${e.message})`);
   }
 }
+
 
 // ---------- routes ----------
 const routes = [];
@@ -193,7 +257,7 @@ route("POST", "/api/gatherings", async (req, env) => {
   return ev;
 });
 
-route("GET", "/api/gatherings/:id", async (req, env, { id }, ctx) => {
+route("GET", "/api/gatherings/:id", async (req, env, { id }) => {
   let event = await getEvent(env, id);
   try {
     await tick(env, event);
@@ -201,9 +265,6 @@ route("GET", "/api/gatherings/:id", async (req, env, { id }, ctx) => {
     await log(env, id)(`Call queue error: ${e.message}`);
   }
   event = await getEvent(env, id);
-  // A matchmaker run that stopped at its deadline or died goes quiet: this poll restarts it.
-  if (["requested", "running"].includes(event.mm_status) && (!event.mm_heartbeat_at || Date.now() - Date.parse(event.mm_heartbeat_at) > MM_STALE_MS))
-    kickMatchmaker(env, ctx, id);
   const [list, matched, logs] = await Promise.all([
     select(env, `people?event_id=eq.${v(id)}&order=created_at,uid`),
     select(env, `matches?event_id=eq.${v(id)}&select=uid`),
@@ -292,23 +353,23 @@ route("POST", "/api/gatherings/:id/collect", async (req, env, { id }) => {
   return { collected: got };
 });
 
-route("POST", "/api/gatherings/:id/match", async (req, env, { id }, ctx) => {
+route("POST", "/api/gatherings/:id/reextract", async (req, env, { id }) => {
+  const event = await getEvent(env, id);
+  const people = await select(env, `people?event_id=eq.${v(id)}&transcript=not.is.null`);
+  let filled = 0;
+  for (const p of people) {
+    const answers = await extractAnswers(env, event, p.transcript);
+    if (noAnswers(answers)) continue;
+    await setPerson(env, p.uid, { status: "answered", answers });
+    filled++;
+  }
+  await log(env, id)(`Re-read ${people.length} transcripts: answers found for ${filled}`);
+  return { transcripts: people.length, filled };
+});
+
+route("POST", "/api/gatherings/:id/match", async (req, env, { id }) => {
   const event = await getEvent(env, id);
   const people = await select(env, `people?event_id=eq.${v(id)}&status=eq.answered`);
-  // MATCHER=matchmaker hands off to the Python matchmaker; on Vercel the service binding implies it.
-  if ((env.MATCHER ?? (env.MATCHMAKER_URL ? "matchmaker" : "local")) === "matchmaker") {
-    // Hand off to the Python matchmaker (matchmaker/web_bridge.py), which runs Jev precompute and writes
-    // `matches` itself. The dashboard shows its progress from mm_done / mm_total.
-    if (people.length < 2) throw new HttpError(400, "Need at least 2 people who answered");
-    if (["requested", "running"].includes(event.mm_status)) throw new HttpError(409, "Matching is already running");
-    await update(env, `events?id=eq.${v(id)}`, {
-      mm_status: "requested", mm_event_id: null, mm_error: null, mm_done: 0, mm_total: people.length * (people.length - 1),
-      mm_requested_at: new Date().toISOString(),
-    });
-    await log(env, id)(`Sent ${people.length} guests to the matchmaker`);
-    kickMatchmaker(env, ctx, id);
-    return { queued: people.length };
-  }
   const rows = await computeMatches(env, event, people, log(env, id));
   await remove(env, `matches?event_id=eq.${v(id)}`);
   await insert(env, "matches", rows.map((r) => ({ event_id: id, rank: 1, ...r, must_meet: !!r.must_meet })));
@@ -333,21 +394,6 @@ route("POST", "/api/gatherings/:id/send-links", async (req, env, { id }) => {
   await log(env, id)(`Links sent: ${sent}/${people.length}${isDemo(env) ? " · demo mode: not actually texted" : ""}`);
   return { sent };
 });
-
-// The matchmaker runs as a sibling service; MATCHMAKER_URL comes from the service binding in vercel.json.
-// waitUntil keeps this function alive while it works. Without the binding (matchmaker on a laptop under
-// uvicorn), the matchmaker polls the events table for requests instead.
-const MM_STALE_MS = 45000; // matches web_bridge.STALE_SECONDS
-function kickMatchmaker(env, ctx, id) {
-  if (!env.MATCHMAKER_URL) return;
-  const url = new URL(`bridge/${encodeURIComponent(id)}`, env.MATCHMAKER_URL.replace(/\/?$/, "/"));
-  const headers = env.HOST_KEY ? { authorization: `Bearer ${env.HOST_KEY}` } : {};
-  ctx.waitUntil(
-    fetch(url, { method: "POST", headers })
-      .then(async (r) => r.ok || console.warn(`matchmaker /bridge ${r.status}: ${(await r.text()).slice(0, 200)}`))
-      .catch((e) => console.warn(`matchmaker /bridge failed: ${e.message}`)),
-  );
-}
 
 // ---------- guest API ----------
 async function guestByToken(env, token) {
@@ -418,6 +464,8 @@ export default {
         return json({ error: e.message }, e.status ?? 500);
       }
     }
-    return json({ error: "not found" }, 404); // pages are static files, served before this function runs
+    if (url.pathname === "/" || url.pathname === "/host") return env.ASSETS.fetch(new URL("/host", url));
+    if (url.pathname.startsWith("/m/")) return env.ASSETS.fetch(new URL("/m", url));
+    return env.ASSETS.fetch(req);
   },
 };

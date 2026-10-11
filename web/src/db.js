@@ -3,7 +3,7 @@
 const PROJECT_URL = "https://euzqbkrabyxlbqdcsddj.supabase.co";
 
 async function sb(env, method, path, { body, prefer } = {}) {
-  if (!env.SUPABASE_SERVICE_KEY) throw new Error("SUPABASE_SERVICE_KEY not set (vercel env add SUPABASE_SERVICE_KEY)");
+  if (!env.SUPABASE_SERVICE_KEY) throw new Error("SUPABASE_SERVICE_KEY not set (wrangler secret put SUPABASE_SERVICE_KEY)");
   const res = await fetch(`${env.SUPABASE_URL ?? PROJECT_URL}/rest/v1/${path}`, {
     method,
     headers: {
