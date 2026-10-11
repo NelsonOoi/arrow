@@ -7,21 +7,21 @@
  *
  * Reads:  store.events, store.getGuests(id) (for the live event's counts)
  * Writes: store.importEvent(partifulUrl) -> navigates to setup step 1
- * MOCK:   import doesn't call Partiful; it clones the seeded setup event.
+ * MOCK:   import doesn't call Partiful; it returns a fixed sample event.
  *
  * Each row links to where that event needs the host next:
- *   setup -> its current setup step · live -> live dashboard · ended -> recap (stub)
+ *   setup -> its current setup step · ready / live / ended -> event dashboard
  */
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ArrowRight, Button, ButtonLink, StatusTag } from '../components/ui';
-import { SAMPLE_PARTIFUL_URL, seedContactsSwapped } from '../mock/data';
+import { SAMPLE_PARTIFUL_URL } from '../mock/data';
 import { dayOfMonth, monthShort, timeShort } from '../format';
 import { useStore } from '../store';
 import type { ArrowEvent } from '../types';
 
-const STEP_NUMBER = { import: 1, questions: 2, finish: 3 } as const;
+const STEP_NUMBER = { import: 1, questions: 2 } as const;
 
 /** What the host sees while an import runs. */
 const IMPORT_STAGES = ['Reading the event page', 'Pulling the guest list', 'Drafting your call plan'];
@@ -49,6 +49,7 @@ export function EventsOverview() {
 
   const counts = {
     live: events.filter((e) => e.phase.kind === 'live').length,
+    upcoming: events.filter((e) => e.phase.kind === 'ready').length,
     setup: events.filter((e) => e.phase.kind === 'setup').length,
     ended: events.filter((e) => e.phase.kind === 'ended').length,
   };
@@ -61,7 +62,7 @@ export function EventsOverview() {
             Your <em>events</em>
           </h1>
           <p className="page-head__lede">
-            {counts.live} live · {counts.setup} setting up · {counts.ended} past
+            {counts.live} live · {counts.upcoming} upcoming · {counts.setup} setting up · {counts.ended} past
           </p>
         </div>
         {/* Opens the import panel below. The only way to create an event. */}
@@ -120,7 +121,7 @@ export function EventsOverview() {
       ) : (
         <ul className="ledger">
           {events.map((ev) => (
-            <EventRow key={ev.id} event={ev} checkedIn={getGuests(ev.id).filter((g) => g.liveState !== 'not-checked-in').length} guestCount={getGuests(ev.id).length} />
+            <EventRow key={ev.id} event={ev} checkedIn={getGuests(ev.id).filter((g) => g.checkedIn).length} guestCount={getGuests(ev.id).length} />
           ))}
         </ul>
       )}
@@ -143,7 +144,8 @@ function EventRow({ event, checkedIn, guestCount }: { event: ArrowEvent; checked
             Live now
           </StatusTag>
         )}
-        {phase.kind === 'setup' && <StatusTag tone="ochre">Setting up · step {STEP_NUMBER[phase.step]} of 3</StatusTag>}
+        {phase.kind === 'ready' && <StatusTag tone="moss">Upcoming · calling guests</StatusTag>}
+        {phase.kind === 'setup' && <StatusTag tone="ochre">Setting up · step {STEP_NUMBER[phase.step]} of 2</StatusTag>}
         {phase.kind === 'ended' && <StatusTag tone="ink">Ended</StatusTag>}
         <span className="ledger__name">{event.name}</span>
         <span className="soft">
@@ -152,27 +154,20 @@ function EventRow({ event, checkedIn, guestCount }: { event: ArrowEvent; checked
           {isLive && (
             <>
               {' '}
-              · <b style={{ color: 'var(--ink)' }}>{checkedIn}</b> here, <b style={{ color: 'var(--ink)' }}>{seedContactsSwapped}</b> contacts swapped
+              · <b style={{ color: 'var(--ink)' }}>{checkedIn}</b> checked in
             </>
           )}
         </span>
       </div>
       <div className="ledger__action">
-        {phase.kind === 'live' && (
-          <ButtonLink to={`/events/${event.id}/live`} variant="ink">
-            Open dashboard <ArrowRight />
-          </ButtonLink>
-        )}
-        {phase.kind === 'setup' && (
+        {phase.kind === 'setup' ? (
           <ButtonLink to={`/events/${event.id}/setup/${phase.step}`} variant="outline">
             Continue setup
           </ButtonLink>
-        )}
-        {/* Recap screen not built yet. */}
-        {phase.kind === 'ended' && (
-          <Button variant="quiet" disabled>
-            Recap coming soon
-          </Button>
+        ) : (
+          <ButtonLink to={`/events/${event.id}`} variant={isLive ? 'ink' : 'outline'}>
+            Open dashboard <ArrowRight />
+          </ButtonLink>
         )}
       </div>
     </li>

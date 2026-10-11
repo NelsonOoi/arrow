@@ -4,7 +4,6 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
 import { Link, type LinkProps } from 'react-router-dom';
 
-import type { PairColor } from '../types';
 
 type Variant = 'primary' | 'ink' | 'outline' | 'quiet';
 
@@ -128,15 +127,4 @@ export type Tone = 'moss' | 'ochre' | 'indigo' | 'pen' | 'ink';
 /** Dot + word status. Status is never color alone (DESIGN.md §9). */
 export function StatusTag({ tone, live, children }: { tone: Tone; live?: boolean; children: ReactNode }) {
   return <span className={`tag tag--${tone} ${live ? 'tag--live' : ''}`}>{children}</span>;
-}
-
-/** A matched pair's passcode: color swatch + keyword. The only place pair colors appear. */
-export function PairMark({ color, keyword }: { color: PairColor; keyword: string }) {
-  return (
-    <span className="pairmark">
-      <span className="pairmark__swatch" style={{ background: `var(--pair-${color})` }} aria-hidden="true" />
-      <span className="pairmark__word">{keyword}</span>
-      <span className="visually-hidden">({color})</span>
-    </span>
-  );
 }

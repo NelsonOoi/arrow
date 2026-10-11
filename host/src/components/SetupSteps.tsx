@@ -1,6 +1,7 @@
 /**
- * The three-step setup trail shown on every setup screen:
- * Import → Questions → Finish setting up. Completed steps link back.
+ * The two-step setup trail shown on every setup screen:
+ * Import → Questions. Finishing Questions opens the event dashboard.
+ * Completed steps link back.
  */
 import { Link } from 'react-router-dom';
 
@@ -10,7 +11,6 @@ import { Scribble } from './HandMarks';
 const STEPS: { key: SetupStep; label: string }[] = [
   { key: 'import', label: 'Import' },
   { key: 'questions', label: 'Questions' },
-  { key: 'finish', label: 'Finish setting up' },
 ];
 
 export function SetupSteps({ eventId, current }: { eventId: string; current: SetupStep }) {

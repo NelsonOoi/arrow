@@ -2,35 +2,30 @@
  * MOCK: seeded data standing in for the backend.
  *
  * Replace each export with an API call when the backend exists:
- *   - `seedEvents`        -> GET /events
- *   - `seedGuests(id)`    -> GET /events/:id/guests (live states come over a realtime channel)
- *   - `draftCallPlan(ev)` -> POST /events/:id/call-plan/draft (LLM drafts from the description)
- *   - `seedPairs`, `seedActivity` -> realtime feed for the live dashboard
+ *   - `seedEvents`            -> GET /events
+ *   - `seedGuests(id)`        -> GET /events/:id/guests (call/text/check-in status via realtime)
+ *   - `mockPartifulImport`    -> POST /events/import { partifulUrl }
+ *   - `draftCallPlan(ev)`     -> POST /events/:id/call-plan/draft (LLM drafts from the description)
+ *   - `duringEventMetrics(id)`-> GET /events/:id/metrics (hardcoded for the demo)
  *
- * Numbers are chosen so every screen agrees with every other one.
+ * All events and people are fictional. Numbers are chosen so screens agree.
  */
-import type {
-  ActivityItem,
-  ArrowEvent,
-  CallPlan,
-  CallStatus,
-  Guest,
-  GuestLiveState,
-  Pair,
-  Voice,
+import {
+  DEFAULT_MATCHING,
+  type ArrowEvent,
+  type CallPlan,
+  type CallStatus,
+  type DashboardMetrics,
+  type Guest,
+  type TextStatus,
+  type Voice,
 } from '../types';
 
 /** A Partiful link that always imports successfully in the mock. Shown as "Use a sample link". */
 export const SAMPLE_PARTIFUL_URL = 'https://partiful.com/e/bN7xq2LmT4sample';
 
-/**
- * MOCK: what Arrow gets back from Partiful for a pasted link.
- * Real version: POST /events/import { partifulUrl } -> scrape/SDK -> this shape.
- * Fictional event; every field is what the import screen shows.
- */
-export async function mockPartifulImport(
-  partifulUrl: string,
-): Promise<Omit<ArrowEvent, 'id' | 'phase'>> {
+/** MOCK: what Arrow gets back from Partiful for a pasted link. */
+export async function mockPartifulImport(partifulUrl: string): Promise<Omit<ArrowEvent, 'id' | 'phase'>> {
   await new Promise((r) => setTimeout(r, 400));
   return {
     partifulUrl,
@@ -42,51 +37,65 @@ export async function mockPartifulImport(
     endsAt: '2026-10-24T22:00:00',
     venue: 'Hayes Valley loft, San Francisco',
     hostName: 'Jordan Lee',
-    matching: { topN: 5, graceMinutes: 15 },
+    matching: DEFAULT_MATCHING,
   };
 }
 
 export const seedEvents: ArrowEvent[] = [
   {
     id: 'evt-live',
-    partifulUrl: 'https://partiful.com/e/[LIVE-EVENT-ID]',
-    name: '[Event name]',
+    partifulUrl: 'https://partiful.com/e/cL1mateBu1lders',
+    name: 'Climate Builders Meetup',
     description:
-      '[Event description pulled from Partiful — who it is for, what the host hopes people get out of it, the vibe.]',
+      'Monthly meetup for people working on climate — founders, researchers, operators and the curious. Short intros, then lots of time to talk.',
     kind: 'networking',
     startsAt: '2026-10-11T19:00:00',
     endsAt: '2026-10-11T22:00:00',
-    venue: '[Venue]',
-    hostName: '[Host name]',
+    venue: 'Mission Street studio, San Francisco',
+    hostName: 'Priya Shah',
     phase: { kind: 'live' },
-    matching: { topN: 5, graceMinutes: 15 },
+    matching: DEFAULT_MATCHING,
+  },
+  {
+    id: 'evt-ready',
+    partifulUrl: 'https://partiful.com/e/pR0ductSupper',
+    name: 'Product Supper Club',
+    description:
+      'A long-table dinner for product managers and designers. Bring a problem you’re stuck on; leave with three people who can help.',
+    kind: 'networking',
+    startsAt: '2026-10-16T19:30:00',
+    endsAt: '2026-10-16T22:00:00',
+    venue: 'Valencia St. restaurant, San Francisco',
+    hostName: 'Marcus Webb',
+    phase: { kind: 'ready' },
+    matching: DEFAULT_MATCHING,
   },
   {
     id: 'evt-setup',
-    partifulUrl: 'https://partiful.com/e/[EVENT-ID]',
-    name: '[Event name]',
+    partifulUrl: 'https://partiful.com/e/a1T1nkerersNight',
+    name: 'AI Tinkerers Night',
     description:
-      '[Event description pulled from Partiful — e.g. a founders’ mixer for people building early-stage companies, hoping to connect builders with each other and with a few investors.]',
+      'Demos and drinks for people building with AI — engineers, researchers and founders. Show what you’re hacking on and find collaborators.',
     kind: 'networking',
     startsAt: '2026-10-18T19:00:00',
     endsAt: '2026-10-18T22:00:00',
-    venue: '[Venue]',
-    hostName: '[Host name]',
+    venue: 'SoMa co-working space, San Francisco',
+    hostName: 'Dana Kim',
     phase: { kind: 'setup', step: 'questions' },
-    matching: { topN: 5, graceMinutes: 15 },
+    matching: DEFAULT_MATCHING,
   },
   {
     id: 'evt-past',
-    partifulUrl: 'https://partiful.com/e/[PAST-EVENT-ID]',
-    name: '[Event name]',
-    description: '[Event description]',
+    partifulUrl: 'https://partiful.com/e/r00ftopSendoff',
+    name: 'Rooftop Summer Send-off',
+    description: 'Last rooftop party of the summer. Good music, better people.',
     kind: 'social',
     startsAt: '2026-09-27T20:00:00',
     endsAt: '2026-09-27T23:30:00',
-    venue: '[Venue]',
-    hostName: '[Host name]',
+    venue: 'Rooftop, North Beach',
+    hostName: 'Alex Moreno',
     phase: { kind: 'ended' },
-    matching: { topN: 5, graceMinutes: 15 },
+    matching: DEFAULT_MATCHING,
   },
 ];
 
@@ -98,86 +107,51 @@ const FIRST = [
 ];
 const LAST = 'ABCDEFGHJKLMNPRSTVWYZ';
 
-const GOALS = [
-  'Find a technical co-founder',
-  'Meet seed investors',
-  'Hire a first designer',
-  'Swap notes with other founders',
-  'Learn about climate startups',
-  'Meet people building with AI',
-];
-
-/** Fictional guest list. Index ranges set the state mix so the counts line up across screens. */
-function makeGuests(callStatusFor: (i: number) => CallStatus, liveFor: (i: number) => GuestLiveState): Guest[] {
+/** 48 fictional guests; the last 4 have no phone number. */
+function makeGuests(call: (i: number) => CallStatus, text: (i: number) => TextStatus, checkedIn: (i: number) => boolean): Guest[] {
   return FIRST.map((first, i) => {
-    const callStatus = callStatusFor(i);
-    const reached = callStatus === 'done';
+    const noPhone = i >= 44;
     return {
       id: `g${i + 1}`,
       name: `${first} ${LAST[i % LAST.length]}.`,
-      phoneLast4: callStatus === 'no-phone' ? null : String(1000 + ((i * 7919) % 9000)).slice(-4),
+      phoneLast4: noPhone ? null : String(1000 + ((i * 7919) % 9000)).slice(-4),
       rsvp: i % 9 === 4 ? 'maybe' : 'going',
-      intake: reached || callStatus === 'not-called' || callStatus === 'in-progress' || callStatus === 'no-answer-retrying' ? 'call' : 'event-info',
-      callStatus,
-      goal: reached ? GOALS[i % GOALS.length] : callStatus === 'unreachable' || callStatus === 'no-phone' ? 'From event info only' : null,
-      liveState: liveFor(i),
-      metCount: 0,
+      callStatus: noPhone ? 'no-phone' : call(i),
+      textStatus: noPhone ? 'not-sent' : text(i),
+      checkedIn: checkedIn(i),
     };
   });
 }
 
-/**
- * Live event: 48 guests. 38 profiles from calls, 6 unreachable, 4 without a phone.
- * Checked in: 26 = 6 guided + 12 in a match + 3 looking + 5 roaming. 22 not here yet.
- */
-const liveGuests = makeGuests(
-  (i) => (i >= 44 ? 'no-phone' : i >= 38 ? 'unreachable' : 'done'),
-  (i) => {
-    if (i < 6) return 'guided';
-    if (i < 18) return 'in-match';
-    if (i < 21) return 'looking';
-    if (i < 26) return 'roaming';
-    return 'not-checked-in';
-  },
-).map((g, i) => ({ ...g, metCount: i < 26 ? 1 + (i % 3) : 0 }));
-
-/**
- * Event in setup: 48 guests, 44 with phones. Calls: 26 done, 3 retrying, 15 not yet, 4 no phone.
- */
-const setupGuests = makeGuests(
-  (i) => (i >= 44 ? 'no-phone' : i < 26 ? 'done' : i < 29 ? 'no-answer-retrying' : 'not-called'),
-  () => 'not-checked-in',
-);
+const GUESTS: Record<string, Guest[]> = {
+  /** Live: every call made (38 answered, 6 unreachable). 44 texted, 36 joined the app. 26 checked in. */
+  'evt-live': makeGuests(
+    (i) => (i >= 38 ? 'unreachable' : 'done'),
+    (i) => (i < 36 ? 'joined' : 'sent'),
+    (i) => i < 26,
+  ),
+  /** Ready: calls under way (26 done, 1 on the line, 2 retrying, 15 to go). No text blast yet. */
+  'evt-ready': makeGuests(
+    (i) => (i < 26 ? 'done' : i === 26 ? 'in-progress' : i < 29 ? 'no-answer-retrying' : 'not-called'),
+    () => 'not-sent',
+    () => false,
+  ),
+  /** Setup: nothing has gone out yet. */
+  'evt-setup': makeGuests(() => 'not-called', () => 'not-sent', () => false),
+};
 
 export function seedGuests(eventId: string): Guest[] {
-  if (eventId === 'evt-live') return liveGuests;
-  if (eventId === 'evt-setup') return setupGuests;
-  return [];
+  return GUESTS[eventId] ?? GUESTS['evt-setup'];
 }
 
-/** Pairs on the live dashboard. Guest ids line up with `liveGuests` states. */
-export const seedPairs: Pair[] = [
-  { id: 'p1', guestIds: ['g1', 'g2'], color: 'amber', keyword: 'LANTERN', status: 'guided', distanceM: 8 },
-  { id: 'p2', guestIds: ['g3', 'g4'], color: 'violet', keyword: 'VELVET', status: 'still-looking-check', secondsLeft: 18 },
-  { id: 'p3', guestIds: ['g5', 'g6'], color: 'rose', keyword: 'COMET', status: 'guided', distanceM: 3 },
-  { id: 'p4', guestIds: ['g7', 'g8'], color: 'teal', keyword: 'ORBIT', status: 'talking', minutes: 6 },
-  { id: 'p5', guestIds: ['g9', 'g10'], color: 'blue', keyword: 'HARBOR', status: 'talking', minutes: 2 },
-  { id: 'p6', guestIds: ['g11', 'g12'], color: 'moss', keyword: 'FERN', status: 'talking', minutes: 11 },
-  { id: 'p7', guestIds: ['g13', 'g14'], color: 'teal', keyword: 'MAPLE', status: 'talking', minutes: 4 },
-  { id: 'p8', guestIds: ['g15', 'g16'], color: 'amber', keyword: 'TIDE', status: 'talking', minutes: 9 },
-  { id: 'p9', guestIds: ['g17', 'g18'], color: 'violet', keyword: 'QUILL', status: 'talking', minutes: 1 },
-];
-
-export const seedActivity: ActivityItem[] = [
-  { at: '7:22', text: 'Uma Z. checked in and asked for a match' },
-  { at: '7:21', text: 'Two guests swapped contacts' },
-  { at: '7:20', text: 'VELVET pair hadn’t met after 1.5 min — asked “still looking?”' },
-  { at: '7:19', text: 'COMET pair matched and guided' },
-  { at: '7:15', text: 'Top-5 wait ended. Pairing with the best person who’s here.' },
-];
-
-/** Contacts swapped so far tonight on the live event. */
-export const seedContactsSwapped = 9;
+/**
+ * MOCK: during-event numbers, hardcoded for the demo. `null` until the event starts.
+ * (Calls and texts are derived from guest statuses on the dashboard.)
+ */
+export function duringEventMetrics(eventId: string): DashboardMetrics['during'] {
+  if (eventId === 'evt-live') return { checkedIn: 26, matchesMade: 21, contactsSwapped: 9 };
+  return null;
+}
 
 /** MOCK: placeholder voices until the calling provider is chosen. */
 export const voices: Voice[] = [
@@ -186,10 +160,7 @@ export const voices: Voice[] = [
   { id: 'voice-3', label: '[Voice 3]', description: 'Neutral · calm', sampleUrl: '' },
 ];
 
-/**
- * MOCK: the first draft of a call plan. The real version is an LLM call that
- * reads `event.description` and `event.kind`.
- */
+/** MOCK: the first draft of a call plan. Real version: an LLM reads `event.description` and `event.kind`. */
 export function draftCallPlan(event: ArrowEvent): CallPlan {
   return {
     goal:
@@ -205,13 +176,16 @@ export function draftCallPlan(event: ArrowEvent): CallPlan {
       },
       { id: 'q4', text: 'Describe the one person you’d most want to meet tonight.', gets: ['ideal match'], isKey: false },
     ],
-    removed: [],
     opening: {
-      line: `Hi, this is Arrow, calling for ${event.hostName}’s event on [Date]. I’ll ask a few quick questions so we can introduce you to the right people there. Is now a good time?`,
+      line: `Hi, this is Arrow, calling for ${event.hostName}’s event, ${event.name}. I’ll ask a few quick questions so we can introduce you to the right people there. Is now a good time?`,
       tone: 'warm',
       voiceId: 'voice-1',
     },
     retry: { attempts: 1, waitMinutes: 120 },
-    signedOff: false,
   };
+}
+
+/** MOCK: default text blast message. `{first}` and `{link}` are filled per guest when sending. */
+export function defaultBlastMessage(event: ArrowEvent) {
+  return `Hi {first}! You’re going to ${event.name}. Arrow will point you to the people you should meet there. Get the app and join the event here: {link}`;
 }
