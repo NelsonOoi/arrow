@@ -120,7 +120,7 @@ async function tick(env, event) {
     const term = call.status?.terminationType;
     // roughly when the call ended: placed + ring time + talk time
     const endedSecsAgo = (Date.now() - Date.parse(call.createdAt)) / 1000 - (call.duration ?? 0) - 30;
-    if (term === "completed" && !call.transcript && endedSecsAgo < 60) return; // transcript lands a few seconds later
+    if (term === "completed" && !call.transcript && endedSecsAgo < 180) return; // transcript usually lands seconds after hang-up; allow up to 3 min
     if (term === "completed" && call.transcript && (call.duration ?? 0) > 20) {
       await setPerson(env, calling.uid, { status: "answered", source: "call", transcript: call.transcript, answers: await extractAnswers(env, event, call.transcript) });
       await say(`✓ ${calling.name} answered (${call.duration}s)`);
