@@ -3,6 +3,7 @@
 import { placeCall, getCall, sendSms, listMessages } from "./dial.js";
 import { computeMatches, profile } from "./match.js";
 import { select, first as firstRow, insert, update, remove, v, inList } from "./db.js";
+import { isDemo, demoCall, demoCallStatus, answersFor, transcriptFor, smsReplyFor } from "./demo.js";
 
 const BEACON_COLORS = ["#FF5A36", "#2EE59D", "#3D7BFF", "#FFC531", "#E040FB", "#00D4FF"];
 const BEACON_TTL_MIN = 10;
@@ -106,6 +107,13 @@ async function tick(env, event) {
   const calling = await firstRow(env, `people?event_id=eq.${v(event.id)}&status=eq.calling`);
   if (calling) {
     if (!calling.call_id) return;
+    if (calling.call_id.startsWith("demo_")) {
+      const sim = demoCallStatus(calling.call_id);
+      if (sim.status.state !== "Terminated") return;
+      const answers = answersFor(questionsFor(event), calling.uid);
+      await setPerson(env, calling.uid, { status: "answered", source: "call", transcript: transcriptFor(event, calling, answers), answers });
+      await say(`✓ ${calling.name} answered (${sim.duration}s, demo call)`);
+    } else {
     const call = await getCall(env, calling.call_id);
     if (call.status?.state !== "Terminated") return;
     const term = call.status?.terminationType;
@@ -118,6 +126,7 @@ async function tick(env, event) {
     } else {
       await textQuestions(env, event, calling, `${term ?? "no answer"}`);
     }
+    }
   }
   if (!event.calls_on) return;
   const next = await firstRow(env, `people?event_id=eq.${v(event.id)}&status=eq.pending&order=created_at`);
@@ -129,9 +138,9 @@ async function tick(env, event) {
   // claim the row first so two overlapping polls can't both dial
   const claimed = await update(env, `people?uid=eq.${v(next.uid)}&status=eq.pending`, { status: "calling" });
   if (!claimed.length) return;
-  await say(`Calling ${next.name} (${next.phone})`);
+  await say(`Calling ${next.name} (${next.phone})${isDemo(env) ? " · demo mode, no Dial key: simulated call" : ""}`);
   try {
-    const call = await placeCall(env, { to: next.phone, instruction: callInstruction(event, next), idempotencyKey: `${event.id}-${next.uid}`, maxSeconds: MAX_CALL_SECONDS });
+    const call = isDemo(env) ? demoCall(next.uid) : await placeCall(env, { to: next.phone, instruction: callInstruction(event, next), idempotencyKey: `${event.id}-${next.uid}`, maxSeconds: MAX_CALL_SECONDS });
     await setPerson(env, next.uid, { call_id: call.id });
   } catch (e) {
     await textQuestions(env, event, next, `call failed: ${e.message}`);
@@ -140,7 +149,7 @@ async function tick(env, event) {
 
 async function textQuestions(env, event, person, why) {
   try {
-    await sendSms(env, person.phone, smsQuestions(event, person));
+    if (!isDemo(env)) await sendSms(env, person.phone, smsQuestions(event, person));
     await setPerson(env, person.uid, { status: "sms_sent", source: "sms", sms_sent_at: new Date().toISOString() });
     await log(env, event.id)(`${person.name}: ${why} → texted the questions`);
   } catch (e) {
@@ -243,6 +252,12 @@ route("POST", "/api/events/:id/collect", async (req, env, { id }) => {
   const waiting = await select(env, `people?event_id=eq.${v(id)}&status=eq.sms_sent`);
   let got = 0;
   for (const p of waiting) {
+    if (isDemo(env)) {
+      const answers = answersFor(questionsFor(event), p.uid);
+      await setPerson(env, p.uid, { status: "answered", transcript: smsReplyFor(answers), answers });
+      got++;
+      continue;
+    }
     const replies = (await listMessages(env, p.phone, p.sms_sent_at))
       .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
       .map((m) => m.body ?? "")
@@ -252,7 +267,7 @@ route("POST", "/api/events/:id/collect", async (req, env, { id }) => {
     await setPerson(env, p.uid, { status: "answered", transcript: replies, answers: await extractAnswers(env, event, replies) });
     got++;
   }
-  await log(env, id)(`Text replies collected: ${got}/${waiting.length}`);
+  await log(env, id)(`Text replies collected: ${got}/${waiting.length}${isDemo(env) ? " · demo mode: simulated replies" : ""}`);
   return { collected: got };
 });
 
@@ -273,14 +288,14 @@ route("POST", "/api/events/:id/send-links", async (req, env, { id }) => {
   let sent = 0;
   for (const p of people) {
     try {
-      await sendSms(env, p.phone, `${event.name}: here's the person you should meet 👉 ${origin}/m/${p.token}`);
+      if (!isDemo(env)) await sendSms(env, p.phone, `${event.name}: here's the person you should meet 👉 ${origin}/m/${p.token}`);
       await setPerson(env, p.uid, { link_sent_at: new Date().toISOString() });
       sent++;
     } catch (e) {
       await log(env, id)(`✗ link to ${p.name} failed (${e.message})`);
     }
   }
-  await log(env, id)(`Links sent: ${sent}/${people.length}`);
+  await log(env, id)(`Links sent: ${sent}/${people.length}${isDemo(env) ? " · demo mode: not actually texted" : ""}`);
   return { sent };
 });
 
