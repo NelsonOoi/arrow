@@ -8,7 +8,12 @@ import { colors, font } from '@/theme';
 function useMatchCardTrigger() {
   const head = useRadar((s) => s.alertQueue[0]);
   const pathname = usePathname();
-  const blocked = pathname.startsWith('/match/') || pathname === '/onboarding';
+  const blocked =
+    pathname.startsWith('/match/') ||
+    pathname.startsWith('/find/') ||
+    pathname.startsWith('/signal/') ||
+    pathname === '/devices' ||
+    pathname === '/onboarding';
   // The card shifts the queue on unmount, which can land after the pathname has already
   // changed back, so remember which head was opened instead of trusting `blocked` alone.
   const openedHead = useRef<string | null>(null);

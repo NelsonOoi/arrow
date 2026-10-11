@@ -14,8 +14,9 @@ import { getMatches, getUserById } from '@/data/users';
 import { vibrateProximityAlert } from '@/haptics/alert';
 import { useRadar } from '@/store/radar';
 import { useSession } from '@/store/session';
-import type { ProximityConfig, Sighting } from '@/types';
+import type { DeviceSighting, NearbyDevice, ProximityConfig, Sighting } from '@/types';
 
+import { pruneDevices, recordDevice } from './devices';
 import { initialEngineState, reduce, type EngineEvent } from './engine';
 
 /** Minimum interval between peer writes to `useRadar`; sightings can arrive many times per second. */
@@ -29,6 +30,7 @@ export function useProximity(): void {
   const currentUserId = useSession((s) => s.currentUserId);
   const scanning = useSession((s) => s.scanning);
   const threshold = useSession((s) => s.threshold);
+  const scanAllDevices = useSession((s) => s.scanAllDevices);
 
   const activeUserId = scanning && getUserById(currentUserId) ? currentUserId : null;
 
@@ -64,6 +66,9 @@ export function useProximity(): void {
 
     engineRef.current = initialEngineState();
     let flushedPeers = engineRef.current.peers;
+    // Mutated in place per advertisement; only copied into the store on flush.
+    const devices = new Map<string, NearbyDevice>();
+    let devicesDirty = false;
 
     const flushPeers = () => {
       if (flushTimer !== null) {
@@ -75,6 +80,10 @@ export function useProximity(): void {
       if (peers !== flushedPeers) {
         flushedPeers = peers;
         radar.setPeers(peers);
+      }
+      if (devicesDirty) {
+        devicesDirty = false;
+        radar.setDevices(Object.fromEntries(devices));
       }
     };
 
@@ -107,6 +116,14 @@ export function useProximity(): void {
       }
     };
 
+    const onDevice = (sighting: DeviceSighting) => {
+      if (cancelled) return;
+      if (recordDevice(devices, sighting, SMOOTHING_WINDOW)) {
+        devicesDirty = true;
+        scheduleFlush();
+      }
+    };
+
     const onError = (message: string) => {
       if (cancelled) return;
       radar.setStatus('error', message);
@@ -128,7 +145,10 @@ export function useProximity(): void {
       bleRunning = true;
       try {
         startPresence(user.token);
-        startScanning(onSighting, onError);
+        startScanning(onSighting, onError, {
+          allDevices: scanAllDevices,
+          onDevice: scanAllDevices ? onDevice : undefined,
+        });
       } catch (e) {
         stopBle();
         radar.setStatus('error', errorMessage(e));
@@ -163,6 +183,7 @@ export function useProximity(): void {
         tickTimer = setInterval(() => {
           if (cancelled) return;
           dispatch({ type: 'tick' });
+          if (pruneDevices(devices, Date.now(), STALE_MS)) devicesDirty = true;
           flushPeers();
         }, TICK_MS);
         if (readiness === 'granted') {
@@ -189,7 +210,7 @@ export function useProximity(): void {
       // Denial turns scanning off, which lands here; keep the status so the UI can explain why.
       if (denied) useRadar.getState().setStatus('denied');
     };
-  }, [activeUserId]);
+  }, [activeUserId, scanAllDevices]);
 }
 
 function errorMessage(e: unknown): string {

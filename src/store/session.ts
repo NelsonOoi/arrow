@@ -11,13 +11,16 @@ import {
 type SessionState = {
   currentUserId: string | null;
   scanning: boolean;
+  /** Scan every Bluetooth device instead of only Arrow phones. Not persisted. */
+  scanAllDevices: boolean;
   threshold: number;
-  wavedUserIds: string[];
+  metUserIds: string[];
   hasHydrated: boolean;
   setCurrentUser: (id: string | null) => void;
   setScanning: (scanning: boolean) => void;
+  setScanAllDevices: (scanAllDevices: boolean) => void;
   setThreshold: (threshold: number) => void;
-  wave: (userId: string) => void;
+  markMet: (userId: string) => void;
 };
 
 export const useSession = create<SessionState>()(
@@ -25,18 +28,20 @@ export const useSession = create<SessionState>()(
     (set) => ({
       currentUserId: null,
       scanning: false,
+      scanAllDevices: false,
       threshold: DEFAULT_RSSI_THRESHOLD,
-      wavedUserIds: [],
+      metUserIds: [],
       hasHydrated: false,
-      setCurrentUser: (id) => set({ currentUserId: id, scanning: false, wavedUserIds: [] }),
+      setCurrentUser: (id) => set({ currentUserId: id, scanning: false, metUserIds: [] }),
       setScanning: (scanning) => set({ scanning }),
+      setScanAllDevices: (scanAllDevices) => set({ scanAllDevices }),
       setThreshold: (threshold) =>
         set({
           threshold: Math.min(MAX_RSSI_THRESHOLD, Math.max(MIN_RSSI_THRESHOLD, threshold)),
         }),
-      wave: (userId) =>
+      markMet: (userId) =>
         set((s) =>
-          s.wavedUserIds.includes(userId) ? s : { wavedUserIds: [...s.wavedUserIds, userId] },
+          s.metUserIds.includes(userId) ? s : { metUserIds: [...s.metUserIds, userId] },
         ),
     }),
     {
@@ -45,7 +50,7 @@ export const useSession = create<SessionState>()(
       partialize: (s) => ({
         currentUserId: s.currentUserId,
         threshold: s.threshold,
-        wavedUserIds: s.wavedUserIds,
+        metUserIds: s.metUserIds,
       }),
       onRehydrateStorage: () => () => {
         useSession.setState({ hasHydrated: true });

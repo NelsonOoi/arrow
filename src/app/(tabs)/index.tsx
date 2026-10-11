@@ -1,101 +1,196 @@
 import { useKeepAwake } from 'expo-keep-awake';
-import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
-import { Card } from '@/components/Card';
-import { Pill } from '@/components/Pill';
+import { PulseDot } from '@/components/PulseDot';
 import { Screen } from '@/components/Screen';
-import { SignalBar } from '@/components/SignalBar';
+import { SignalMeter } from '@/components/SignalMeter';
 import { StatusBanner } from '@/components/StatusBanner';
 import { text } from '@/components/typography';
-import { getUserByToken } from '@/data/users';
+import { getMatches, getUserById, matchColor } from '@/data/users';
+import { useSignal } from '@/proximity/useSignal';
 import { useRadar } from '@/store/radar';
 import { useSession } from '@/store/session';
-import { colors, spacing } from '@/theme';
-import type { PeerState, User } from '@/types';
+import { colors, font, radius, spacing } from '@/theme';
+import type { PeerState, RadarStatus, User } from '@/types';
 
 function KeepAwake() {
   useKeepAwake();
   return null;
 }
 
+function headline(scanning: boolean, status: RadarStatus): { title: string; detail: string } {
+  if (!scanning) {
+    return { title: 'Scanning is off', detail: 'Turn it on to see which matches are around.' };
+  }
+  if (status === 'starting') return { title: 'Starting Bluetooth…', detail: 'One moment.' };
+  return {
+    title: 'Scanning for your matches',
+    detail: 'Your phone buzzes when one gets close. Tap a match to find them.',
+  };
+}
+
 export default function NearbyScreen() {
+  const currentUser = useSession((s) => getUserById(s.currentUserId));
   const scanning = useSession((s) => s.scanning);
   const setScanning = useSession((s) => s.setScanning);
-  const threshold = useSession((s) => s.threshold);
   const status = useRadar((s) => s.status);
   const error = useRadar((s) => s.error);
   const peers = useRadar((s) => s.peers);
 
-  const inRange = useMemo(() => {
-    const rows: { peer: PeerState; user: User }[] = [];
-    for (const peer of Object.values(peers)) {
-      const user = peer.isMatch ? getUserByToken(peer.token) : undefined;
-      if (user) rows.push({ peer, user });
-    }
-    return rows.sort((a, b) => b.peer.smoothedRssi - a.peer.smoothedRssi);
-  }, [peers]);
+  if (!currentUser) return null;
+  const matches = getMatches(currentUser);
+  const inRange = matches.filter((m) => peers[m.token]).length;
+  const { title, detail } = headline(scanning, status);
+  const problem = status === 'denied' || status === 'poweredOff' || status === 'error';
 
   return (
     <Screen>
       {scanning ? <KeepAwake /> : null}
-      <Button
-        size="lg"
-        variant={scanning ? 'danger' : 'primary'}
-        label={scanning ? 'Stop scanning' : 'Start scanning'}
-        onPress={() => setScanning(!scanning)}
-      />
-      <StatusBanner status={status} error={error} />
-      <Text style={text.small}>Alert threshold: {threshold} dBm</Text>
 
-      <Text style={[text.section, styles.sectionTitle]}>Matches in range</Text>
-      {inRange.length === 0 ? (
-        <Text style={text.muted}>No matches in range yet. Keep the app open and walk around.</Text>
-      ) : (
-        inRange.map(({ peer, user }) => (
-          <Card key={peer.token} highlight={peer.isNear}>
-            <View style={styles.row}>
-              <View style={styles.info}>
-                <Text style={text.heading}>{user.name}</Text>
-                <Text style={text.muted}>
-                  {user.role} @ {user.company}
-                </Text>
-              </View>
-              {peer.isNear ? <Pill label="Near" tone="near" /> : null}
-            </View>
-            <View style={styles.signal}>
-              <SignalBar rssi={peer.smoothedRssi} near={peer.isNear} />
-              <Text style={[text.small, peer.isNear && styles.nearText]}>
-                {Math.round(peer.smoothedRssi)} dBm
-              </Text>
-            </View>
-          </Card>
-        ))
-      )}
+      <View style={styles.hero}>
+        <View style={styles.heroRow}>
+          <PulseDot
+            color={scanning && status === 'running' ? colors.near : colors.far}
+            active={scanning && status === 'running'}
+          />
+          <View style={styles.heroText}>
+            <Text style={text.heading}>{title}</Text>
+            <Text style={text.small}>{detail}</Text>
+          </View>
+        </View>
+        <Button
+          size="lg"
+          variant={scanning ? 'secondary' : 'primary'}
+          label={scanning ? 'Stop scanning' : 'Start scanning'}
+          onPress={() => setScanning(!scanning)}
+        />
+      </View>
+
+      {problem ? <StatusBanner status={status} error={error} /> : null}
+
+      <Text style={[text.section, styles.sectionTitle]}>
+        Your matches{scanning ? ` · ${inRange} in range` : ''}
+      </Text>
+      <View style={styles.list}>
+        {matches.map((match, i) => (
+          <MatchRow
+            key={match.id}
+            me={currentUser}
+            match={match}
+            peer={peers[match.token]}
+            scanning={scanning}
+            divider={i > 0}
+          />
+        ))}
+      </View>
     </Screen>
   );
 }
 
+type MatchRowProps = {
+  me: User;
+  match: User;
+  peer: PeerState | undefined;
+  scanning: boolean;
+  divider: boolean;
+};
+
+function MatchRow({ me, match, peer, scanning, divider }: MatchRowProps) {
+  const reading = useSignal(peer ? { rssi: peer.smoothedRssi, lastSeen: peer.lastSeen } : undefined);
+  const near = reading.live && !!peer?.isNear;
+  const label = reading.live
+    ? reading.level.label
+    : scanning
+      ? 'Not detected yet'
+      : 'Start scanning to see signal';
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Find ${match.name}. ${label}`}
+      onPress={() => router.push({ pathname: '/find/[token]', params: { token: match.token } })}
+      style={({ pressed }) => [styles.row, divider && styles.rowDivider, pressed && styles.pressed]}>
+      <Avatar user={match} color={matchColor(me, match)} size={40} />
+      <View style={styles.rowText}>
+        <Text style={styles.name} numberOfLines={1}>
+          {match.name}
+        </Text>
+        <Text style={[styles.status, near && styles.statusNear]} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
+      <SignalMeter
+        strength={reading.strength}
+        color={near ? colors.near : colors.primary}
+        trackColor={colors.surfaceRaised}
+        bars={8}
+        height={24}
+      />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  sectionTitle: {
-    marginTop: spacing.md,
+  hero: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.lg,
   },
-  row: {
+  heroRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
-  info: {
+  heroText: {
     flex: 1,
     gap: spacing.xs,
   },
-  signal: {
+  sectionTitle: {
+    marginTop: spacing.md,
+  },
+  list: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
+    minHeight: 64,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  nearText: {
+  rowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  pressed: {
+    backgroundColor: colors.surfaceRaised,
+  },
+  rowText: {
+    flex: 1,
+    gap: 2,
+  },
+  name: {
+    color: colors.text,
+    fontSize: font.headline,
+    fontWeight: '600',
+  },
+  status: {
+    color: colors.textMuted,
+    fontSize: font.small,
+  },
+  statusNear: {
     color: colors.near,
+    fontWeight: '600',
   },
 });

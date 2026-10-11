@@ -5,6 +5,10 @@ export type User = {
   name: string;
   role: string;
   company: string;
+  /** Lowercase phrase that completes "is working on …" and "ask about …". */
+  workingOn: string;
+  /** Lowercase phrase that completes "looking for …". */
+  lookingFor: string;
   interests: string[];
   matchIds: string[];
 };
@@ -18,6 +22,24 @@ export type Sighting = {
   rssi: number;
   ts: number;
   source: TokenSource;
+};
+
+/** One advertisement from any Bluetooth device, Arrow or not. Only collected in all-devices mode. */
+export type DeviceSighting = {
+  deviceId: string;
+  name: string | null;
+  rssi: number;
+  ts: number;
+};
+
+export type NearbyDevice = {
+  id: string;
+  /** Last non-empty advertised name; names arrive intermittently in scan responses. */
+  name: string | null;
+  samples: number[];
+  smoothedRssi: number;
+  firstSeen: number;
+  lastSeen: number;
 };
 
 export type ProximityConfig = {
