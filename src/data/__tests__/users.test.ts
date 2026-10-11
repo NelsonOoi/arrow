@@ -1,5 +1,5 @@
 import { TOKEN_PATTERN } from '@/ble/constants';
-import { getMatches, getUserById, getUserByToken, matchColor, USERS } from '@/data/users';
+import { getMatches, getUserById, getUserByToken, matchColor, matchKeyword, USERS } from '@/data/users';
 
 describe('USERS', () => {
   it('has unique ids', () => {
@@ -45,6 +45,17 @@ describe('USERS', () => {
       }
       const colors = matches.map((m) => matchColor(user, m));
       expect(new Set(colors).size).toBe(colors.length);
+    }
+  });
+
+  it('gives both sides of a match the same keyword, unique among each person’s matches', () => {
+    for (const user of USERS) {
+      const matches = getMatches(user);
+      for (const match of matches) {
+        expect(matchKeyword(user, match)).toBe(matchKeyword(match, user));
+      }
+      const words = matches.map((m) => matchKeyword(user, m));
+      expect(new Set(words).size).toBe(words.length);
     }
   });
 

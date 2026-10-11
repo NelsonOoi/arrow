@@ -1,25 +1,23 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { EVENT_NAME } from '@/data/users';
-import { colors, font, spacing } from '@/theme';
+import { ArrowGlyph } from '@/components/HandMarks';
+import { EVENT } from '@/data/event';
+import { colors, font, fonts, spacing } from '@/theme';
 
+/** Wordmark and event name, like the host app's top bar on phones. */
 export function BrandBar() {
   return (
     <View style={styles.row}>
       <View style={styles.brand}>
-        <View style={styles.mark}>
-          <View style={styles.pointer} />
-        </View>
+        <ArrowGlyph size={26} />
         <Text style={styles.wordmark}>Arrow</Text>
       </View>
       <Text style={styles.event} numberOfLines={1}>
-        {EVENT_NAME}
+        {EVENT.name}
       </Text>
     </View>
   );
 }
-
-const MARK_SIZE = 18;
 
 const styles = StyleSheet.create({
   row: {
@@ -27,44 +25,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
-    minHeight: 44,
+    minHeight: 48,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1.5,
+    borderBottomColor: colors.border,
+    borderStyle: 'dashed',
   },
   brand: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  mark: {
-    width: MARK_SIZE,
-    height: MARK_SIZE,
-    borderRadius: MARK_SIZE / 2,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pointer: {
-    width: 0,
-    height: 0,
-    marginBottom: 1,
-    borderLeftWidth: 3.5,
-    borderRightWidth: 3.5,
-    borderBottomWidth: 7,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: colors.primary,
-    transform: [{ rotate: '35deg' }],
-  },
   wordmark: {
     color: colors.text,
-    fontSize: font.small,
-    fontWeight: '700',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    fontFamily: fonts.display,
+    fontSize: 24,
+    letterSpacing: -0.7,
   },
   event: {
     flexShrink: 1,
     color: colors.textMuted,
+    fontFamily: fonts.body,
     fontSize: font.small,
   },
 });

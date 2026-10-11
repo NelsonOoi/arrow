@@ -10,7 +10,7 @@ import { text } from '@/components/typography';
 import { signalStrength } from '@/proximity/signal';
 import { useScanWhileMounted } from '@/proximity/useScanWhileMounted';
 import { useRadar } from '@/store/radar';
-import { colors, font, radius, spacing } from '@/theme';
+import { colors, font, fonts, radius, spacing } from '@/theme';
 import type { NearbyDevice } from '@/types';
 
 const MAX_ROWS = 40;
@@ -145,12 +145,13 @@ const styles = StyleSheet.create({
   },
   name: {
     color: colors.text,
+    fontFamily: fonts.bodySemibold,
     fontSize: font.body,
-    fontWeight: '600',
   },
   id: {
     ...text.mono,
     color: colors.textMuted,
+    fontFamily: fonts.body,
     fontSize: font.caption,
   },
   dbm: {

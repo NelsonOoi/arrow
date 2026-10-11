@@ -10,7 +10,7 @@ import {
 import { startPresence, stopPresence } from '@/ble/peripheral';
 import { ensureBluetoothReady, onAdapterPoweredChange } from '@/ble/permissions';
 import { startScanning, stopScanning } from '@/ble/scanner';
-import { getMatches, getUserById } from '@/data/users';
+import { activeMatches, getUserById } from '@/data/users';
 import { vibrateProximityAlert } from '@/haptics/alert';
 import { useRadar } from '@/store/radar';
 import { useSession } from '@/store/session';
@@ -46,14 +46,16 @@ export function useProximity(): void {
     if (!user) return;
 
     const radar = useRadar.getState();
-    const matchTokens: ReadonlySet<string> = new Set(getMatches(user).map((m) => m.token));
     const buildConfig = (): ProximityConfig => ({
       threshold: thresholdRef.current,
       hysteresis: HYSTERESIS_DB,
       windowSize: SMOOTHING_WINDOW,
       cooldownMs: ALERT_COOLDOWN_MS,
       staleMs: STALE_MS,
-      matchTokens,
+      // Read fresh each time so a match stops alerting as soon as it's decided on.
+      matchTokens: new Set(
+        activeMatches(user, useSession.getState().outcomes).map((m) => m.token),
+      ),
     });
 
     let cancelled = false;

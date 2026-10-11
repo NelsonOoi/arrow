@@ -1,17 +1,19 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
-import { Button } from '@/components/Button';
-import { firstName, isMutual, matchColor, sharedInterests } from '@/data/users';
-import { colors, font, radius, spacing } from '@/theme';
+import { Stamp, StampButton } from '@/components/Stamp';
+import { firstName, isMutual, matchColor, matchKeyword, sharedInterests } from '@/data/users';
+import { colors, font, fonts, sheetCorners, spacing } from '@/theme';
 import type { PeerState, User } from '@/types';
 
 type MatchCardProps = {
   me: User;
   match: User;
   peer?: PeerState;
-  met?: boolean;
-  onFind: () => void;
+  /** We found each other but I haven't chosen whether to swap contacts yet. */
+  found?: boolean;
+  /** Opens the finder, or the swap-contacts choice once `found`. */
+  onAction: () => void;
 };
 
 function joinList(items: string[]): string {
@@ -25,7 +27,7 @@ function proximityLabel(peer: PeerState | undefined): { label: string; near: boo
   return { label: 'Not detected yet', near: false };
 }
 
-export function MatchCard({ me, match, peer, met = false, onFind }: MatchCardProps) {
+export function MatchCard({ me, match, peer, found = false, onAction }: MatchCardProps) {
   const first = firstName(match);
   const shared = sharedInterests(me, match);
   const proximity = proximityLabel(peer);
@@ -53,21 +55,30 @@ export function MatchCard({ me, match, peer, met = false, onFind }: MatchCardPro
 
       <Text style={styles.summary}>{summary}</Text>
 
+      {/* The pair's passcode as a mini stamp: their color and their word in one mark. */}
+      <View
+        style={styles.pair}
+        accessible
+        accessibilityLabel={`Your pair word is ${matchKeyword(me, match)}. ${first} sees the same color and word.`}>
+        <Stamp size="sm" color={matchColor(me, match)}>
+          <Text style={styles.keyword}>{matchKeyword(me, match)}</Text>
+        </Stamp>
+        <Text style={styles.pairHint}>Same color and word on {first}’s phone</Text>
+      </View>
+
       <View style={styles.facts}>
         <Fact label="Looking for" value={match.lookingFor} />
         <Fact label="Into" value={match.interests.join(', ')} />
         <Fact
           label="Right now"
-          value={met ? `${proximity.label} · you've met` : proximity.label}
+          value={found ? `${proximity.label} · you found each other` : proximity.label}
           highlight={proximity.near}
         />
       </View>
 
-      <Button
-        size="lg"
-        variant={met ? 'secondary' : 'primary'}
-        label={met ? `Find ${first} again` : `Find ${first}`}
-        onPress={onFind}
+      <StampButton
+        label={found ? `Swap contacts with ${first}` : `Find ${first}`}
+        onPress={onAction}
         style={styles.action}
       />
     </View>
@@ -85,17 +96,17 @@ function Fact({ label, value, highlight = false }: { label: string; value: strin
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.accentSurface,
-    borderColor: colors.accentBorder,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.lg,
-    padding: spacing.lg + spacing.xs,
+    ...sheetCorners,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    padding: spacing.xl,
     gap: spacing.lg,
   },
   eyebrow: {
-    color: colors.primary,
+    color: colors.primaryDeep,
+    fontFamily: fonts.bodySemibold,
     fontSize: font.caption,
-    fontWeight: '700',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
@@ -110,21 +121,44 @@ const styles = StyleSheet.create({
   },
   name: {
     color: colors.text,
-    fontSize: font.heading,
-    fontWeight: '600',
-    letterSpacing: -0.3,
+    fontFamily: fonts.display,
+    fontSize: 24,
+    letterSpacing: -0.5,
   },
   role: {
     color: colors.textMuted,
+    fontFamily: fonts.body,
     fontSize: font.small,
   },
   summary: {
     color: colors.text,
+    fontFamily: fonts.body,
     fontSize: font.body,
     lineHeight: 22,
   },
+  pair: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  keyword: {
+    color: colors.ink,
+    fontFamily: fonts.monoBold,
+    fontSize: font.body,
+    letterSpacing: 1.5,
+  },
+  pairHint: {
+    flex: 1,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: font.small,
+  },
   facts: {
     gap: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: 1.5,
+    borderTopColor: colors.border,
+    borderStyle: 'dashed',
   },
   fact: {
     flexDirection: 'row',
@@ -133,18 +167,20 @@ const styles = StyleSheet.create({
   factLabel: {
     width: 84,
     color: colors.textMuted,
+    fontFamily: fonts.body,
     fontSize: font.small,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   factValue: {
     flex: 1,
     color: colors.textSecondary,
+    fontFamily: fonts.body,
     fontSize: font.small,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   factHighlight: {
     color: colors.near,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemibold,
   },
   action: {
     marginTop: spacing.xs,

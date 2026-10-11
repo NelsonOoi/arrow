@@ -11,7 +11,27 @@ export type User = {
   lookingFor: string;
   interests: string[];
   matchIds: string[];
+  /** What this person hands over when both sides choose to swap contacts. */
+  contact: Contact;
 };
+
+export type Contact = {
+  phone?: string;
+  email?: string;
+  /** Profile URL without the scheme, e.g. `linkedin.com/in/mayachen`. */
+  linkedin?: string;
+  /** X (Twitter) handle without the @. */
+  twitter?: string;
+};
+
+/**
+ * Where one of my matches stands.
+ *   found         -> we found each other; I still have to choose whether to swap contacts
+ *   interested    -> I want to swap contacts
+ *   notInterested -> I passed
+ * Matches with no outcome yet are still being looked for.
+ */
+export type MatchOutcome = 'found' | 'interested' | 'notInterested';
 
 export type TokenSource = 'localName' | 'gatt';
 

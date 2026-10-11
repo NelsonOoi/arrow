@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { AlertDistance } from '@/components/AlertDistance';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Pill';
@@ -152,6 +153,9 @@ export default function DebugScreen() {
         onPress={() => router.push('/devices')}
       />
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+
+      <Text style={[text.section, styles.sectionTitle]}>Alert distance</Text>
+      <AlertDistance />
 
       <Text style={[text.section, styles.sectionTitle]}>Peers</Text>
       {sortedPeers.length === 0 ? (

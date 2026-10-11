@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useFrameCallback,
@@ -8,8 +8,10 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
+import Svg, { Path } from 'react-native-svg';
 
-const SIZE = 96;
+const SIZE = 168;
+const ARROW_SIZE = 104;
 const RING_OFFSETS = [0, 0.5];
 
 type SonarArrowProps = {
@@ -45,7 +47,17 @@ export function SonarArrow({ strength, live, color }: SonarArrowProps) {
         : RING_OFFSETS.map((offset) => (
             <Ring key={offset} offset={offset} phase={phase} intensity={intensity} color={color} />
           ))}
-      <Text style={[styles.arrow, { color }]}>↑</Text>
+      <Svg width={ARROW_SIZE} height={ARROW_SIZE} viewBox="0 0 48 48">
+        {/* Slightly wobbly strokes to match the hand-drawn marks in the host app. */}
+        <Path
+          d="M24 42 C 23.6 32, 24.3 20, 24 7 M10 20.5 C 15 15.5, 19.5 11, 24 6.5 C 28.5 11, 33 15.5, 38 20.5"
+          stroke={color}
+          strokeWidth={5.5}
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
     </View>
   );
 }
@@ -80,11 +92,6 @@ const styles = StyleSheet.create({
     width: SIZE,
     height: SIZE,
     borderRadius: SIZE / 2,
-    borderWidth: 2,
-  },
-  arrow: {
-    fontSize: 44,
-    lineHeight: 52,
-    fontWeight: '500',
+    borderWidth: 3,
   },
 });

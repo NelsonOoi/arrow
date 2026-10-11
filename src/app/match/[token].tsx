@@ -9,16 +9,17 @@ import { MatchCard } from '@/components/MatchCard';
 import { Screen } from '@/components/Screen';
 import { text } from '@/components/typography';
 import { firstName, getUserById, getUserByToken } from '@/data/users';
+import { openMatch } from '@/navigation';
 import { useRadar } from '@/store/radar';
 import { useSession } from '@/store/session';
-import { spacing } from '@/theme';
+import { colors, fonts, spacing } from '@/theme';
 
 export default function MatchCardScreen() {
   const params = useLocalSearchParams<{ token?: string | string[] }>();
   const token = (Array.isArray(params.token) ? params.token[0] : params.token) ?? '';
   const user = getUserByToken(token);
   const currentUser = useSession((s) => getUserById(s.currentUserId));
-  const met = useSession((s) => (user ? s.metUserIds.includes(user.id) : false));
+  const found = useSession((s) => (user ? s.outcomes[user.id] === 'found' : false));
   const peer = useRadar((s) => s.peers[token]);
 
   // Runs on button dismiss and swipe dismiss alike. Only shift if this card is still the queue
@@ -34,7 +35,7 @@ export default function MatchCardScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/(tabs)');
+      router.replace('/');
     }
   };
 
@@ -44,14 +45,14 @@ export default function MatchCardScreen() {
       {user && currentUser ? (
         <>
           <Text style={[text.title, styles.title]}>
-            {firstName(currentUser)}, meet {firstName(user)}.
+            {firstName(currentUser)}, meet <Text style={styles.emphasis}>{firstName(user)}</Text>.
           </Text>
           <MatchCard
             me={currentUser}
             match={user}
             peer={peer}
-            met={met}
-            onFind={() => router.push({ pathname: '/find/[token]', params: { token } })}
+            found={found}
+            onAction={() => openMatch(token, found)}
           />
         </>
       ) : (
@@ -71,6 +72,10 @@ const styles = StyleSheet.create({
   title: {
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
+  },
+  emphasis: {
+    fontFamily: fonts.displayItalic,
+    color: colors.primary,
   },
   unknown: {
     marginTop: spacing.lg,

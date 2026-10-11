@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { text } from '@/components/typography';
-import { USERS } from '@/data/users';
+import { DEMO_PEOPLE } from '@/data/users';
 import { useSession } from '@/store/session';
 import { colors, spacing } from '@/theme';
 
@@ -18,14 +18,14 @@ export default function OnboardingScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/(tabs)');
+      router.replace('/');
     }
   };
 
   return (
     <Screen edges={['left', 'right', 'bottom']}>
       <Text style={text.muted}>Pick a different person on each demo phone.</Text>
-      {USERS.map((user) => (
+      {DEMO_PEOPLE.map((user) => (
         <Pressable
           key={user.id}
           accessibilityRole="button"
