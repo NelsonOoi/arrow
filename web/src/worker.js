@@ -208,7 +208,7 @@ async function tick(env, event) {
   }
   await say(`Calling ${next.name} (${next.phone})${isDemo(env) ? " · demo mode, no Dial key: simulated call" : ""}`);
   try {
-    const call = isDemo(env) ? demoCall(next.uid) : await placeCall(env, { to: next.phone, instruction: callInstruction(event, next), idempotencyKey: `${event.id}-${next.uid}`, maxSeconds: MAX_CALL_SECONDS });
+    const call = isDemo(env) ? demoCall(next.uid) : await placeCall(env, { to: next.phone, instruction: callInstruction(event, next), idempotencyKey: claim, maxSeconds: MAX_CALL_SECONDS });
     await setPerson(env, next.uid, { call_id: call.id });
   } catch (e) {
     await update(env, `people?uid=eq.${v(next.uid)}`, { status: "sms_sent", source: "sms", sms_sent_at: new Date().toISOString() });
