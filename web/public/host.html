@@ -140,6 +140,7 @@
     tbody tr:hover { background: var(--paper-sunk); }
     td .who { font-weight: 500; }
     td .sub { color: var(--ink-soft); font-size: 13px; }
+    td.goal { max-width: 220px; font-size: 14px; }
     .tag { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; }
     .tag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
     .tag.moss { color: var(--moss); } .tag.ochre { color: var(--ochre); } .tag.indigo { color: var(--indigo); }
@@ -405,18 +406,19 @@
             <input class="search" id="q" placeholder="Search by name, company, or what they want" value="${esc(query)}" autocomplete="off" aria-label="Search guests" />
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Guest</th><th class="col-hide">Phone</th><th>Call</th><th>Match</th></tr></thead>
+                <thead><tr><th>Guest</th><th class="col-hide">Phone</th><th>Call</th><th class="col-hide">Looking for</th><th>Match</th></tr></thead>
                 <tbody>
                   ${shown.length ? shown.map((p) => {
                     const [label, cls] = STATUS[p.status] ?? [p.status, "faint"];
                     return `
                       <tr data-uid="${esc(p.uid)}" tabindex="0">
-                        <td><div class="who">${esc(p.name || "—")}</div><div class="sub">${esc([p.position, p.company].filter(Boolean).join(" · "))}</div></td>
+                        <td><div class="who">${esc(p.name || "—")}</div><div class="sub">${esc([p.position, p.company].filter(Boolean).join(" · "))}</div>${p.interest || p.hobby ? `<div class="sub">Into ${esc(p.interest || p.hobby)}</div>` : ""}</td>
                         <td class="col-hide mono soft">${esc(last4(p.phone))}</td>
-                        <td><span class="tag ${cls}">${label}${p.source === "sms" ? " by text" : ""}</span></td>
+                        <td><span class="tag ${cls}">${label}${p.status === "answered" && p.source === "sms" ? " by text" : ""}</span></td>
+                        <td class="col-hide goal">${p.goal ? esc(p.goal) : `<span class="soft">—</span>`}</td>
                         <td>${p.matched ? `<span class="tag moss">${p.linkSent ? "Link sent" : "Matched"}</span>` : `<span class="tag faint">Not yet</span>`}</td>
                       </tr>`;
-                  }).join("") : `<tr><td colspan="4" class="empty">${people.length ? "Nobody matches that." : "No guests yet. Add them with a name and phone number."}</td></tr>`}
+                  }).join("") : `<tr><td colspan="5" class="empty">${people.length ? "Nobody matches that." : "No guests yet. Add them with a name and phone number."}</td></tr>`}
                 </tbody>
               </table>
             </div>
