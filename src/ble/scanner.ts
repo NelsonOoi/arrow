@@ -1,7 +1,7 @@
 import { addDeviceFoundListener, addEventListener, startScan, stopScan } from 'munim-bluetooth';
 import type { BLEDevice } from 'munim-bluetooth';
 
-import type { Sighting, TokenSource } from '@/types';
+import type { DeviceSighting, Sighting, TokenSource } from '@/types';
 
 import {
   ARROW_SERVICE_UUID,
@@ -23,10 +23,22 @@ type ScanSession = {
 
 let session: ScanSession | null = null;
 
+export type ScanOptions = {
+  /**
+   * Scan without the Arrow service filter and report every device to `onDevice`. Arrow peers are
+   * still resolved, but GATT is only attempted on devices that advertise the Arrow service, so we
+   * never connect to strangers' hardware. iOS peers advertising from the background are missed in
+   * this mode because their service UUID is only visible to filtered scans.
+   */
+  allDevices?: boolean;
+  onDevice?: (sighting: DeviceSighting) => void;
+};
+
 /** Scans for ARROW_SERVICE_UUID and emits only sightings whose token has been resolved. */
 export function startScanning(
   onSighting: (sighting: Sighting) => void,
   onError?: (message: string) => void,
+  { allDevices = false, onDevice }: ScanOptions = {},
 ): void {
   stopScanning();
 
@@ -54,7 +66,11 @@ export function startScanning(
     });
   };
 
-  const resolve = (device: BLEDevice, now: number): { token: string; source: TokenSource } | null => {
+  const resolve = (
+    device: BLEDevice,
+    now: number,
+    allowGatt: boolean,
+  ): { token: string; source: TokenSource } | null => {
     const advertised = parseToken(device.localName) ?? parseToken(device.name);
     if (advertised) {
       unnamedSince.delete(device.id);
@@ -65,6 +81,7 @@ export function startScanning(
     if (named) return { token: named, source: 'localName' };
     const read = gattCache.get(device.id, now);
     if (read) return { token: read, source: 'gatt' };
+    if (!allowGatt) return null;
     const since = unnamedSince.get(device.id);
     if (since === undefined) {
       unnamedSince.set(device.id, now);
@@ -78,9 +95,12 @@ export function startScanning(
     if (current.stopped) return;
     const { rssi } = device;
     if (rssi === undefined || rssi === INVALID_RSSI) return;
-    if (device.serviceUUIDs && !device.serviceUUIDs.some(isArrowService)) return;
     const now = Date.now();
-    const resolved = resolve(device, now);
+    onDevice?.({ deviceId: device.id, name: device.localName || device.name || null, rssi, ts: now });
+    const advertisesArrow = device.serviceUUIDs?.some(isArrowService) ?? false;
+    if (device.serviceUUIDs && !advertisesArrow) return;
+    // With the native filter on, a device missing serviceUUIDs is still an Arrow phone.
+    const resolved = resolve(device, now, !allDevices || advertisesArrow);
     if (!resolved) return;
     onSighting({ deviceId: device.id, token: resolved.token, rssi, ts: now, source: resolved.source });
   };
@@ -96,7 +116,11 @@ export function startScanning(
   session = current;
 
   try {
-    startScan({ serviceUUIDs: [ARROW_SERVICE_UUID], allowDuplicates: true, scanMode: 'lowLatency' });
+    startScan({
+      serviceUUIDs: allDevices ? undefined : [ARROW_SERVICE_UUID],
+      allowDuplicates: true,
+      scanMode: 'lowLatency',
+    });
   } catch (error) {
     stopScanning();
     if (!onError) throw error;

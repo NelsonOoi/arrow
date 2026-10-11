@@ -1,5 +1,5 @@
 import { TOKEN_PATTERN } from '@/ble/constants';
-import { getMatches, getUserById, getUserByToken, USERS } from '@/data/users';
+import { getMatches, getUserById, getUserByToken, matchColor, USERS } from '@/data/users';
 
 describe('USERS', () => {
   it('has unique ids', () => {
@@ -34,6 +34,17 @@ describe('USERS', () => {
           symmetric: true,
         });
       }
+    }
+  });
+
+  it('gives both sides of a match the same color, unique among each person’s matches', () => {
+    for (const user of USERS) {
+      const matches = getMatches(user);
+      for (const match of matches) {
+        expect(matchColor(user, match)).toBe(matchColor(match, user));
+      }
+      const colors = matches.map((m) => matchColor(user, m));
+      expect(new Set(colors).size).toBe(colors.length);
     }
   });
 

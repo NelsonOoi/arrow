@@ -2,7 +2,8 @@ import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'rea
 
 import { colors, font, radius, spacing } from '@/theme';
 
-type Variant = 'primary' | 'secondary' | 'danger';
+/** `ink` and `inkSoft` are for screens filled with a bright match color. */
+type Variant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'ink' | 'inkSoft';
 
 type ButtonProps = {
   label: string;
@@ -17,6 +18,18 @@ const backgrounds: Record<Variant, string> = {
   primary: colors.primary,
   secondary: colors.surfaceRaised,
   danger: colors.danger,
+  ghost: 'transparent',
+  ink: colors.ink,
+  inkSoft: colors.inkFill,
+};
+
+const labelColors: Record<Variant, string> = {
+  primary: colors.primaryText,
+  secondary: colors.text,
+  danger: colors.ink,
+  ghost: colors.textMuted,
+  ink: colors.text,
+  inkSoft: colors.ink,
 };
 
 export function Button({
@@ -37,11 +50,14 @@ export function Button({
         styles.base,
         size === 'lg' && styles.large,
         { backgroundColor: backgrounds[variant] },
-        variant === 'secondary' && styles.secondary,
-        (pressed || disabled) && styles.dimmed,
+        disabled && styles.disabled,
+        pressed && styles.pressed,
         style,
       ]}>
-      <Text style={[styles.label, size === 'lg' && styles.largeLabel]}>{label}</Text>
+      <Text
+        style={[styles.label, size === 'lg' && styles.largeLabel, { color: labelColors[variant] }]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -50,28 +66,25 @@ const styles = StyleSheet.create({
   base: {
     minHeight: 48,
     paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   large: {
-    minHeight: 64,
-    borderRadius: radius.lg,
+    minHeight: 56,
+    paddingHorizontal: spacing.xl,
   },
-  secondary: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+  disabled: {
+    opacity: 0.4,
   },
-  dimmed: {
-    opacity: 0.6,
+  pressed: {
+    opacity: 0.75,
   },
   label: {
-    color: colors.primaryText,
     fontSize: font.body,
     fontWeight: '600',
   },
   largeLabel: {
-    fontSize: font.heading,
-    fontWeight: '700',
+    fontSize: font.headline,
   },
 });

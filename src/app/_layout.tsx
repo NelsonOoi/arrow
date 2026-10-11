@@ -34,7 +34,16 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen
             name="match/[token]"
-            options={{ presentation: 'modal', title: 'Match nearby' }}
+            options={{ presentation: 'modal', headerShown: false }}
+          />
+          <Stack.Screen
+            name="find/[token]"
+            options={{ presentation: 'fullScreenModal', animation: 'fade', headerShown: false }}
+          />
+          <Stack.Screen name="devices" options={{ title: 'Signal test' }} />
+          <Stack.Screen
+            name="signal/[deviceId]"
+            options={{ presentation: 'fullScreenModal', animation: 'fade', headerShown: false }}
           />
         </Stack.Protected>
         <Stack.Screen name="onboarding" options={{ title: 'Who are you?' }} />

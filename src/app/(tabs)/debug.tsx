@@ -1,4 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
+import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -145,6 +146,11 @@ export default function DebugScreen() {
         <Button label="Copy CSV" style={styles.flex} onPress={copyCsv} />
       </View>
       <Button label="Clear log" variant="secondary" onPress={clearLog} />
+      <Button
+        label="Test signal with any Bluetooth device"
+        variant="secondary"
+        onPress={() => router.push('/devices')}
+      />
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
       <Text style={[text.section, styles.sectionTitle]}>Peers</Text>

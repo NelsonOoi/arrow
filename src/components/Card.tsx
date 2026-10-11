@@ -16,14 +16,14 @@ export function Card({ children, highlight = false, style }: CardProps) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     padding: spacing.lg,
     gap: spacing.sm,
   },
   highlight: {
     borderColor: colors.near,
-    backgroundColor: '#12291F',
+    backgroundColor: colors.nearSurface,
   },
 });

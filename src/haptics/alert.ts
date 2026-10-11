@@ -18,3 +18,8 @@ export async function vibrateProximityAlert(): Promise<void> {
     // Haptics are best-effort; a failure must never break the radar loop.
   }
 }
+
+/** Light tick for "the signal just got stronger" while searching. Never throws. */
+export function tickSignalStronger(): void {
+  Haptics.selectionAsync().catch(() => {});
+}
