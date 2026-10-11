@@ -61,6 +61,18 @@ create table if not exists public.logs (
 );
 create index if not exists logs_event on public.logs(event_id);
 
+-- Handoff to the Python matchmaker (matchmaker/web_bridge.py), which shares this database.
+-- "Run matching" sets mm_status = 'requested'; the bridge claims it ('running'), runs Jev
+-- precompute in the matchmaker schema, writes public.matches, and sets 'done' or 'failed'. On Vercel the
+-- Worker calls the matchmaker's /bridge/{id} directly and re-calls it when mm_heartbeat_at goes stale.
+alter table public.events add column if not exists mm_status   text check (mm_status in ('requested','running','done','failed'));
+alter table public.events add column if not exists mm_event_id uuid;          -- matchmaker.events.id
+alter table public.events add column if not exists mm_done     integer not null default 0;  -- pairs scored
+alter table public.events add column if not exists mm_total    integer not null default 0;
+alter table public.events add column if not exists mm_error    text;
+alter table public.events add column if not exists mm_requested_at timestamptz;
+alter table public.events add column if not exists mm_heartbeat_at timestamptz;  -- bridge alive; stale = resume
+
 alter table public.events  enable row level security;
 alter table public.people  enable row level security;
 alter table public.matches enable row level security;

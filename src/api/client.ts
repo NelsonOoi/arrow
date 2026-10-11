@@ -1,9 +1,9 @@
-/** Thin client for the matchmaker FastAPI backend (`uv run uvicorn --factory matchmaker.api:app`). */
+/** Thin client for the matchmaker FastAPI backend (on Vercel under `/mm`, or `uv run uvicorn --factory matchmaker.api:app`). */
 
 const DEFAULT_API_URL = 'http://localhost:8000';
 const TIMEOUT_MS = 8_000;
 
-/** Phones can't reach `localhost` on your laptop; set EXPO_PUBLIC_API_URL to its LAN address. */
+/** Set EXPO_PUBLIC_API_URL to the deployment (`https://<project>.vercel.app/mm`) or, for a laptop, its LAN address. */
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL).replace(/\/+$/, '');
 /** Pins the app to one event. Unset, it uses the newest live event. */
 export const EVENT_ID = process.env.EXPO_PUBLIC_EVENT_ID || null;
@@ -15,16 +15,12 @@ export type ApiEvent = {
   id: string;
   name: string;
   status: EventStatus;
-  side_a_label: string;
-  side_b_label: string;
 };
 
 export type ApiAttendee = {
   id: string;
   external_ref: string | null;
   display_name: string;
-  side: 'A' | 'B';
-  side_label: string;
   offering_text: string;
   seeking_text: string;
   topics: string[];

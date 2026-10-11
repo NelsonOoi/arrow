@@ -1,6 +1,9 @@
-// Arrow on Cloudflare Workers: host dashboard at /, guest page at /m/<token>,
-// JSON API under /api (events live at /api/gatherings: ad blockers block anything under
-// /api/events as analytics). Data in Supabase, calls and texts through Dial, scoring by Jev.
+// Arrow's JSON API under /api, run on Vercel by server.js (events live at /api/gatherings: ad blockers
+// block anything under /api/events as analytics). The pages in public/ (host dashboard at /, guest page at
+// /m/<token>) are served statically. Data in Supabase, calls and texts through Dial, matching by the Python
+// matchmaker (or Jev directly in match.js).
+import { generateText, Output } from "ai";
+import { z } from "zod";
 import { placeCall, getCall, sendSms, listMessages } from "./dial.js";
 import { computeMatches, profile } from "./match.js";
 import { select, first as firstRow, insert, update, remove, v, inList } from "./db.js";
@@ -75,25 +78,24 @@ Keep the whole call under 2 minutes. Never ask for email, address, or anything n
 const smsQuestions = (event, person) =>
   `Hi${first(person.name)}! We tried calling for ${event.name} — we find you the person you should meet there. Reply with quick answers:\n${questionsFor(event).map((q, i) => `${i + 1}) ${q.question}`).join("\n")}`;
 
-// Workers AI pulls short answers out of a call transcript or SMS reply.
+// A small model on Vercel AI Gateway pulls short answers out of a call transcript or SMS reply.
+// Auth: Vercel OIDC on deployments, AI_GATEWAY_API_KEY elsewhere. Without either, answers stay empty.
+const EXTRACT_MODEL = "anthropic/claude-haiku-5.5"; // override with AI_GATEWAY_MODEL
+const hasGateway = (env) => !!(env.VERCEL || env.AI_GATEWAY_API_KEY || env.VERCEL_OIDC_TOKEN);
+
 async function extractAnswers(env, event, text) {
   const qs = questionsFor(event);
   const empty = qs.map((q) => ({ key: q.key, question: q.question, answer: null }));
-  if (!text || !env.AI) return empty;
+  if (!text || !hasGateway(env)) return empty;
   try {
-    const out = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
-      messages: [
-        { role: "system", content: "You extract answers from event-guest intake conversations. Reply with JSON only." },
-        {
-          role: "user",
-          content: `Questions:\n${qs.map((q) => `- ${q.key}: ${q.question}`).join("\n")}\n\nConversation:\n"""\n${text.slice(0, 6000)}\n"""\n\nReturn ONLY a JSON object mapping each key to the guest's answer as a short phrase in their own words, or null if they didn't answer.`,
-        },
-      ],
-      max_tokens: 300,
+    const { output } = await generateText({
+      model: env.AI_GATEWAY_MODEL || EXTRACT_MODEL,
+      instructions: "You extract answers from event-guest intake conversations.",
+      prompt: `Questions:\n${qs.map((q) => `- ${q.key}: ${q.question}`).join("\n")}\n\nConversation:\n"""\n${text.slice(0, 6000)}\n"""\n\nGive each answer as a short phrase in the guest's own words, or null if they didn't answer.`,
+      output: Output.object({ schema: z.object(Object.fromEntries(qs.map((q) => [q.key, z.string().nullable()]))) }),
+      maxOutputTokens: 300,
     });
-    const raw = out.response ?? "";
-    const parsed = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
-    return qs.map((q) => ({ key: q.key, question: q.question, answer: parsed[q.key] ?? null }));
+    return qs.map((q) => ({ key: q.key, question: q.question, answer: output[q.key] ?? null }));
   } catch (e) {
     console.warn("extraction failed", e.message);
     return empty;
@@ -191,7 +193,7 @@ route("POST", "/api/gatherings", async (req, env) => {
   return ev;
 });
 
-route("GET", "/api/gatherings/:id", async (req, env, { id }) => {
+route("GET", "/api/gatherings/:id", async (req, env, { id }, ctx) => {
   let event = await getEvent(env, id);
   try {
     await tick(env, event);
@@ -199,6 +201,9 @@ route("GET", "/api/gatherings/:id", async (req, env, { id }) => {
     await log(env, id)(`Call queue error: ${e.message}`);
   }
   event = await getEvent(env, id);
+  // A matchmaker run that stopped at its deadline or died goes quiet: this poll restarts it.
+  if (["requested", "running"].includes(event.mm_status) && (!event.mm_heartbeat_at || Date.now() - Date.parse(event.mm_heartbeat_at) > MM_STALE_MS))
+    kickMatchmaker(env, ctx, id);
   const [list, matched, logs] = await Promise.all([
     select(env, `people?event_id=eq.${v(id)}&order=created_at,uid`),
     select(env, `matches?event_id=eq.${v(id)}&select=uid`),
@@ -287,9 +292,23 @@ route("POST", "/api/gatherings/:id/collect", async (req, env, { id }) => {
   return { collected: got };
 });
 
-route("POST", "/api/gatherings/:id/match", async (req, env, { id }) => {
+route("POST", "/api/gatherings/:id/match", async (req, env, { id }, ctx) => {
   const event = await getEvent(env, id);
   const people = await select(env, `people?event_id=eq.${v(id)}&status=eq.answered`);
+  // MATCHER=matchmaker hands off to the Python matchmaker; on Vercel the service binding implies it.
+  if ((env.MATCHER ?? (env.MATCHMAKER_URL ? "matchmaker" : "local")) === "matchmaker") {
+    // Hand off to the Python matchmaker (matchmaker/web_bridge.py), which runs Jev precompute and writes
+    // `matches` itself. The dashboard shows its progress from mm_done / mm_total.
+    if (people.length < 2) throw new HttpError(400, "Need at least 2 people who answered");
+    if (["requested", "running"].includes(event.mm_status)) throw new HttpError(409, "Matching is already running");
+    await update(env, `events?id=eq.${v(id)}`, {
+      mm_status: "requested", mm_event_id: null, mm_error: null, mm_done: 0, mm_total: people.length * (people.length - 1),
+      mm_requested_at: new Date().toISOString(),
+    });
+    await log(env, id)(`Sent ${people.length} guests to the matchmaker`);
+    kickMatchmaker(env, ctx, id);
+    return { queued: people.length };
+  }
   const rows = await computeMatches(env, event, people, log(env, id));
   await remove(env, `matches?event_id=eq.${v(id)}`);
   await insert(env, "matches", rows.map((r) => ({ event_id: id, rank: 1, ...r, must_meet: !!r.must_meet })));
@@ -314,6 +333,21 @@ route("POST", "/api/gatherings/:id/send-links", async (req, env, { id }) => {
   await log(env, id)(`Links sent: ${sent}/${people.length}${isDemo(env) ? " · demo mode: not actually texted" : ""}`);
   return { sent };
 });
+
+// The matchmaker runs as a sibling service; MATCHMAKER_URL comes from the service binding in vercel.json.
+// waitUntil keeps this function alive while it works. Without the binding (matchmaker on a laptop under
+// uvicorn), the matchmaker polls the events table for requests instead.
+const MM_STALE_MS = 45000; // matches web_bridge.STALE_SECONDS
+function kickMatchmaker(env, ctx, id) {
+  if (!env.MATCHMAKER_URL) return;
+  const url = new URL(`bridge/${encodeURIComponent(id)}`, env.MATCHMAKER_URL.replace(/\/?$/, "/"));
+  const headers = env.HOST_KEY ? { authorization: `Bearer ${env.HOST_KEY}` } : {};
+  ctx.waitUntil(
+    fetch(url, { method: "POST", headers })
+      .then(async (r) => r.ok || console.warn(`matchmaker /bridge ${r.status}: ${(await r.text()).slice(0, 200)}`))
+      .catch((e) => console.warn(`matchmaker /bridge failed: ${e.message}`)),
+  );
+}
 
 // ---------- guest API ----------
 async function guestByToken(env, token) {
@@ -384,8 +418,6 @@ export default {
         return json({ error: e.message }, e.status ?? 500);
       }
     }
-    if (url.pathname === "/" || url.pathname === "/host") return env.ASSETS.fetch(new URL("/host", url));
-    if (url.pathname.startsWith("/m/")) return env.ASSETS.fetch(new URL("/m", url));
-    return env.ASSETS.fetch(req);
+    return json({ error: "not found" }, 404); // pages are static files, served before this function runs
   },
 };

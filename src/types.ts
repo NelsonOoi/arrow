@@ -1,5 +1,3 @@
-export type Side = 'A' | 'B';
-
 /** One attendee of the live event, loaded from the matchmaker's `GET /events/{id}/attendees`. */
 export type User = {
   /** Matchmaker attendee UUID. */
@@ -7,9 +5,6 @@ export type User = {
   /** 4 characters, A-Z and 0-9, assigned by the matchmaker. Advertised over BLE as `${LOCAL_NAME_PREFIX}${token}`. */
   token: string;
   name: string;
-  side: Side;
-  /** The event's name for this side, e.g. "mentee" or "mentor". */
-  sideLabel: string;
   /** What they offer, shown to the people they're paired with. */
   about: string;
   /** What they're looking for. */

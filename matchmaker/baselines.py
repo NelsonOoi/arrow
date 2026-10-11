@@ -7,46 +7,41 @@
 
 import uuid
 
-from matchmaker.refresh import DESIGN_POLICY, PolicyInput, PolicySpec
+from matchmaker.refresh import DESIGN_POLICY, Pairing, PolicyInput, PolicySpec
 
 
-def greedy_policy(p: PolicyInput) -> dict[uuid.UUID, uuid.UUID]:
-    lists = {**p.lists_a, **p.lists_b}
-    side_a = set(p.lists_a)
-    taken: set[uuid.UUID] = set()
+def greedy_policy(p: PolicyInput) -> Pairing:
     out: dict[uuid.UUID, uuid.UUID] = {}
     for x in p.joined_order:
-        if x in taken:
+        if x in out:
             continue
-        for y in lists.get(x, ()):
-            if y not in taken:
-                taken.update((x, y))
-                a, b = (x, y) if x in side_a else (y, x)
-                out[a] = b
+        for y in p.lists.get(x, ()):
+            if y not in out:
+                out[x], out[y] = y, x
                 break
-    return out
+    return Pairing(out, "greedy")
 
 
-def random_policy(p: PolicyInput) -> dict[uuid.UUID, uuid.UUID]:
-    a_ids = sorted(p.lists_a, key=lambda a: p.sort_key[a])
-    p.rng.shuffle(a_ids)
-    taken: set[uuid.UUID] = set()
+def random_policy(p: PolicyInput) -> Pairing:
+    ids = sorted(p.lists, key=lambda x: p.sort_key[x])
+    p.rng.shuffle(ids)
     out: dict[uuid.UUID, uuid.UUID] = {}
-    for a in a_ids:
-        options = [b for b in p.lists_a[a] if b not in taken]
+    for x in ids:
+        if x in out:
+            continue
+        options = [y for y in p.lists[x] if y not in out]
         if options:
-            b = p.rng.choice(options)
-            taken.add(b)
-            out[a] = b
-    return out
+            y = p.rng.choice(options)
+            out[x], out[y] = y, x
+    return Pairing(out, "random")
 
 
-GREEDY_POLICY = PolicySpec("instant_greedy", greedy_policy, stable=False)
-RANDOM_POLICY = PolicySpec("random", random_policy, stable=False)
+GREEDY_POLICY = PolicySpec("instant_greedy", greedy_policy)
+RANDOM_POLICY = PolicySpec("random", random_policy)
 
 # policy name -> (spec, trigger config override)
 POLICIES: dict[str, tuple[PolicySpec, dict]] = {
     "design": (DESIGN_POLICY, {}),
-    "instant_greedy": (GREEDY_POLICY, {"refresh_window_seconds": 0, "refresh_min_per_side": 1}),
+    "instant_greedy": (GREEDY_POLICY, {"refresh_window_seconds": 0, "refresh_min_pending": 1}),
     "random": (RANDOM_POLICY, {}),
 }

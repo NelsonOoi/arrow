@@ -46,8 +46,6 @@ def create_event(
     name: str,
     rubric: dict[str, Any] | None = None,
     config: dict[str, Any] | None = None,
-    side_a_label: str = "mentee",
-    side_b_label: str = "mentor",
 ) -> uuid.UUID:
     rubric = rubric or DEFAULT_RUBRIC
     validate_rubric(rubric)
@@ -56,8 +54,6 @@ def create_event(
             name=name,
             rubric=rubric,
             config={**DEFAULT_CONFIG, **(config or {})},
-            side_a_label=side_a_label,
-            side_b_label=side_b_label,
         )
         s.add(e)
         s.flush()
@@ -95,7 +91,6 @@ def import_attendees(sf: sessionmaker[Session], event_id: uuid.UUID, people: lis
                 event_id=event_id,
                 external_ref=p.get("external_ref") or p.get("id"),
                 display_name=p["display_name"],
-                side=p["side"],
                 seeking_text=p["seeking_text"],
                 offering_text=p["offering_text"],
                 avoid_text=p.get("avoid_text", ""),
@@ -152,7 +147,6 @@ def preferences(sf: sessionmaker[Session], attendee_id: uuid.UUID) -> dict[str, 
             "attendee_id": me.id,
             "external_ref": me.external_ref,
             "name": me.display_name,
-            "side": me.side,
             "ranked": [item(ps, a) for ps, a in rows if ps.rank is not None],
             "unacceptable": [item(ps, a) for ps, a in rows if ps.rank is None],
         }
@@ -167,8 +161,6 @@ def list_events(sf: sessionmaker[Session]) -> list[dict[str, Any]]:
                 "id": e.id,
                 "name": e.name,
                 "status": e.status,
-                "side_a_label": e.side_a_label,
-                "side_b_label": e.side_b_label,
                 "created_at": e.created_at,
             }
             for e in rows
@@ -183,16 +175,13 @@ def roster(sf: sessionmaker[Session], event_id: uuid.UUID) -> dict[str, Any]:
             raise LookupError("event not found")
         people = s.scalars(select(Attendee).where(Attendee.event_id == event_id).order_by(Attendee.external_ref, Attendee.id)).all()
         tokens = ble_tokens([a.id for a in people])
-        labels = {"A": event.side_a_label, "B": event.side_b_label}
         return {
-            "event": {"id": event.id, "name": event.name, "status": event.status, "side_a_label": event.side_a_label, "side_b_label": event.side_b_label},
+            "event": {"id": event.id, "name": event.name, "status": event.status},
             "attendees": [
                 {
                     "id": a.id,
                     "external_ref": a.external_ref,
                     "display_name": a.display_name,
-                    "side": a.side,
-                    "side_label": labels[a.side],
                     "offering_text": a.offering_text,
                     "seeking_text": a.seeking_text,
                     "topics": a.tags.get("topics") or [],

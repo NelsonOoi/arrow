@@ -1,77 +1,87 @@
-"""Gale-Shapley property tests on random, incomplete preference lists."""
+"""Stable roommates property tests on random, incomplete preference lists, checked against brute force."""
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from matchmaker.matching import all_stable_matchings, blocking_pairs, filter_lists, gale_shapley
+from matchmaker.matching import all_stable_pairings, blocking_pairs, filter_lists, max_weight_pairs, stable_roommates
 
 
 @st.composite
-def markets(draw, min_size=2, max_size=30):
-    n_a = draw(st.integers(min_size // 2 or 1, max_size // 2))
-    n_b = draw(st.integers(min_size // 2 or 1, max_size // 2))
-    a_ids = [f"a{i}" for i in range(n_a)]
-    b_ids = [f"b{i}" for i in range(n_b)]
-
-    def lists(own, other):
-        out = {}
-        for x in own:
-            subset = draw(st.lists(st.sampled_from(other), unique=True, max_size=len(other)))
-            out[x] = subset
-        return out
-
-    return lists(a_ids, b_ids), lists(b_ids, a_ids)
+def groups(draw, max_size=10):
+    n = draw(st.integers(1, max_size))
+    ids = [f"p{i}" for i in range(n)]
+    return {x: draw(st.lists(st.sampled_from([y for y in ids if y != x] or [x]), unique=True)) for x in ids}
 
 
-def _is_matching(m, pa, pb):
-    assert len(set(m.values())) == len(m)
-    for a, b in m.items():
-        assert b in pa[a] and a in pb[b], "matched pair must be mutually acceptable"
+def _is_pairing(m, prefs):
+    for x, y in m.items():
+        assert x != y and m[y] == x, "pairing must be symmetric"
+        assert y in prefs[x] and x in prefs[y], "paired people must accept each other"
 
 
-@settings(max_examples=300, deadline=None)
-@given(markets())
-def test_no_blocking_pairs_either_side_proposing(market):
-    pa, pb = market
-    m = gale_shapley(pa, pb)
-    _is_matching(m, pa, pb)
-    assert blocking_pairs(m, pa, pb) == []
-    m2 = gale_shapley(pb, pa)
-    _is_matching(m2, pb, pa)
-    assert blocking_pairs(m2, pb, pa) == []
-
-
-@settings(max_examples=300, deadline=None)
-@given(markets(max_size=12))
-def test_proposer_optimal_against_brute_force(market):
-    pa, pb = market
-    m = gale_shapley(pa, pb)
-    stable = all_stable_matchings(pa, pb)
+@settings(max_examples=500, deadline=None)
+@given(groups(max_size=9))
+def test_irving_agrees_with_brute_force(prefs):
+    prefs = {x: [y for y in lst if y != x] for x, lst in prefs.items()}
+    stable = all_stable_pairings(prefs)
+    m = stable_roommates(prefs)
+    if not stable:
+        assert m is None, "returned a pairing although none is stable"
+        return
+    assert m is not None, "missed an existing stable pairing"
+    _is_pairing(m, prefs)
     assert m in stable
-    rank = {a: {b: i for i, b in enumerate(lst)} for a, lst in pa.items()}
-    for other in stable:
-        for a in pa:
-            mine, theirs = m.get(a), other.get(a)
-            if theirs is None:
-                continue
-            assert mine is not None, "proposer-optimal: never unmatched when matched in some stable matching"
-            assert rank[a][mine] <= rank[a][theirs]
+    # Everyone stable pairing pairs the same people.
+    assert set(m) == set(stable[0])
+
+
+@settings(max_examples=300, deadline=None)
+@given(groups(max_size=16))
+def test_irving_result_is_stable_on_larger_groups(prefs):
+    prefs = {x: [y for y in lst if y != x] for x, lst in prefs.items()}
+    m = stable_roommates(prefs)
+    if m is not None:
+        _is_pairing(m, prefs)
+        assert blocking_pairs(m, prefs) == []
+
+
+@settings(max_examples=300, deadline=None)
+@given(groups(max_size=16))
+def test_max_weight_pairs_as_many_as_possible(prefs):
+    prefs = {x: [y for y in lst if y != x] for x, lst in prefs.items()}
+    m = max_weight_pairs(prefs)
+    _is_pairing(m, prefs)
+    stable = stable_roommates(prefs)
+    if stable is not None:
+        assert len(m) >= len(stable)
+
+
+def test_no_stable_pairing_falls_through_to_none():
+    # The classic instance: p0, p1, p2 each rank the next one first and all rank p3 last.
+    prefs = {
+        "p0": ["p1", "p2", "p3"],
+        "p1": ["p2", "p0", "p3"],
+        "p2": ["p0", "p1", "p3"],
+        "p3": ["p0", "p1", "p2"],
+    }
+    assert stable_roommates(prefs) is None
+    assert all_stable_pairings(prefs) == []
+    assert len(max_weight_pairs(prefs)) == 4
+
+
+def test_simple_stable_pairing():
+    prefs = {"p0": ["p1", "p2", "p3"], "p1": ["p0", "p2", "p3"], "p2": ["p3", "p0", "p1"], "p3": ["p2", "p0", "p1"]}
+    assert stable_roommates(prefs) == {"p0": "p1", "p1": "p0", "p2": "p3", "p3": "p2"}
 
 
 def test_filter_lists_keeps_order_and_requires_mutual_pool_unmet():
     lists = {
-        "a1": ["b3", "b1", "b2"],
-        "a2": ["b1"],
-        "b1": ["a2", "a1"],
-        "b2": ["a2"],  # does not accept a1
-        "b3": ["a1"],
+        "p1": ["p5", "p2", "p3", "p4"],
+        "p2": ["p1", "p4"],
+        "p3": ["p4"],  # does not accept p1
+        "p4": ["p2", "p1"],
+        "p5": ["p1"],
     }
-    fa, fb = filter_lists(["a1", "a2"], ["b1", "b2"], lists, met={("a2", "b1")})
-    assert fa == {"a1": ["b1"], "a2": []}  # b3 not in pool, b2 doesn't accept a1, a2-b1 met
-    assert fb == {"b1": ["a1"], "b2": []}
-
-
-def test_gale_shapley_simple():
-    pa = {"a1": ["b1", "b2"], "a2": ["b1", "b2"]}
-    pb = {"b1": ["a2", "a1"], "b2": ["a1", "a2"]}
-    assert gale_shapley(pa, pb) == {"a2": "b1", "a1": "b2"}
+    f = filter_lists(["p1", "p2", "p3", "p4"], lists, met={("p2", "p4")})
+    # p5 not in pool, p3 doesn't accept p1, p2-p4 already met.
+    assert f == {"p1": ["p2", "p4"], "p2": ["p1"], "p3": [], "p4": ["p1"]}

@@ -32,7 +32,7 @@ def main() -> None:
     if eid is None:
         data = json.loads(args.file.read_text())
         ev = data["event"]
-        eid = setup.create_event(sf, ev["name"], side_a_label=ev["side_a_label"], side_b_label=ev["side_b_label"])
+        eid = setup.create_event(sf, ev["name"])
         setup.import_attendees(sf, eid, data["attendees"])
         print(f"created event {eid} with {len(data['attendees'])} attendees")
 

@@ -15,7 +15,7 @@ def test_full_flow_over_http(sf, clock):
     app = create_app(sf=sf, clock=clock, scorer_factory=FakeScorer, run_scheduler=False)
     with TestClient(app) as c:
         eid = c.post("/events", json={"name": "http"}).json()["id"]
-        ids = c.post(f"/events/{eid}/attendees/import", json={"attendees": people(3, 3, seed=7)}).json()["ids"]
+        ids = c.post(f"/events/{eid}/attendees/import", json={"attendees": people(6, seed=7)}).json()["ids"]
         assert len(ids) == 6
 
         assert c.post(f"/events/{eid}/precompute").status_code == 202
@@ -24,8 +24,8 @@ def test_full_flow_over_http(sf, clock):
             if prog["status"] == "ready":
                 break
             time.sleep(0.05)
-        assert prog["status"] == "ready" and prog["done"] == prog["total"] == 18
-        assert c.post(f"/events/{eid}/attendees/import", json={"attendees": people(1, 0, seed=8)}).status_code == 409
+        assert prog["status"] == "ready" and prog["done"] == prog["total"] == 30
+        assert c.post(f"/events/{eid}/attendees/import", json={"attendees": people(1, seed=8)}).status_code == 409
 
         prefs = c.get(f"/attendees/{ids[0]}/preferences").json()
         assert [r["rank"] for r in prefs["ranked"]] == list(range(1, len(prefs["ranked"]) + 1))
@@ -60,8 +60,8 @@ def test_scheduler_fires_refresh_on_real_clock(sf):
 
     app = create_app(sf=sf, clock=SystemClock(), scorer_factory=FakeScorer, run_scheduler=True)
     with TestClient(app) as c:
-        eid = c.post("/events", json={"name": "sched", "config": {"refresh_min_per_side": 2}}).json()["id"]
-        ids = c.post(f"/events/{eid}/attendees/import", json={"attendees": people(2, 2, seed=9, avoid_rate=0)}).json()["ids"]
+        eid = c.post("/events", json={"name": "sched", "config": {"refresh_min_pending": 4}}).json()["id"]
+        ids = c.post(f"/events/{eid}/attendees/import", json={"attendees": people(4, seed=9, avoid_rate=0)}).json()["ids"]
         c.post(f"/events/{eid}/precompute")
         for _ in range(100):
             if c.get(f"/events/{eid}/precompute").json()["status"] == "ready":
@@ -80,18 +80,18 @@ def test_scheduler_fires_refresh_on_real_clock(sf):
 def test_events_and_roster(sf, clock):
     app = create_app(sf=sf, clock=clock, scorer_factory=FakeScorer, run_scheduler=False)
     with TestClient(app) as c:
-        eid = c.post("/events", json={"name": "roster", "side_a_label": "founder", "side_b_label": "investor"}).json()["id"]
-        ids = c.post(f"/events/{eid}/attendees/import", json={"attendees": people(4, 3, seed=9)}).json()["ids"]
+        eid = c.post("/events", json={"name": "roster"}).json()["id"]
+        ids = c.post(f"/events/{eid}/attendees/import", json={"attendees": people(7, seed=9)}).json()["ids"]
 
         assert c.get("/events").json()[0]["id"] == eid  # newest first
 
         r = c.get(f"/events/{eid}/attendees").json()
-        assert r["event"]["side_a_label"] == "founder"
+        assert r["event"]["name"] == "roster"
         assert sorted(a["id"] for a in r["attendees"]) == sorted(ids)
         tokens = [a["token"] for a in r["attendees"]]
         assert len(set(tokens)) == len(tokens)
         assert all(re.fullmatch(r"[A-Z0-9]{4}", t) for t in tokens)
-        assert {a["side_label"] for a in r["attendees"] if a["side"] == "B"} == {"investor"}
+        assert all("side" not in a for a in r["attendees"])
         assert c.get(f"/events/{eid}/attendees").json() == r  # tokens are stable across calls
         assert c.get("/events/00000000-0000-0000-0000-000000000000/attendees").status_code == 404
 
@@ -102,3 +102,35 @@ def test_ble_tokens_resolve_collisions(monkeypatch):
     monkeypatch.setattr(setup, "_token", lambda aid, salt: f"AAA{salt}")
     ids = [uuid.uuid4() for _ in range(3)]
     assert sorted(setup.ble_tokens(ids).values()) == ["AAA0", "AAA1", "AAA2"]
+
+
+def test_setup_endpoints_need_the_host_key_when_set(sf, clock, monkeypatch):
+    from matchmaker.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "host_key", "s3cret")
+    app = create_app(sf=sf, clock=clock, scorer_factory=FakeScorer, run_scheduler=False)
+    with TestClient(app) as c:
+        assert c.post("/events", json={"name": "locked"}).status_code == 401
+        assert c.post("/events", json={"name": "locked"}, headers={"Authorization": "Bearer nope"}).status_code == 401
+        r = c.post("/events", json={"name": "locked"}, headers={"Authorization": "Bearer s3cret"})
+        assert r.status_code == 201
+        eid = r.json()["id"]
+        assert c.post(f"/events/{eid}/precompute").status_code == 401
+        assert c.post("/bridge/evt_x").status_code == 401
+        assert c.get("/events").status_code == 200  # the app's reads stay open
+        assert c.get(f"/events/{eid}/attendees").status_code == 200
+
+
+def test_refresh_on_request_pairs_without_a_scheduler(sf, clock):
+    """Serverless mode: the app's own polls fire the refresh once the window is up."""
+    app = create_app(sf=sf, clock=clock, scorer_factory=FakeScorer, run_scheduler=False, refresh_on_request=True)
+    with TestClient(app) as c:
+        eid = c.post("/events", json={"name": "serverless"}).json()["id"]
+        ids = c.post(f"/events/{eid}/attendees/import", json={"attendees": people(4, seed=9, avoid_rate=0)}).json()["ids"]
+        assert c.post(f"/events/{eid}/precompute").json()["status"] == "ready"  # finishes inside the request
+        c.post(f"/events/{eid}/live")
+        for i in ids:
+            assert c.post(f"/attendees/{i}/status", json={"status": "available"}).json()["conversation"] is None
+        clock.advance(21)
+        time.sleep(1.1)  # past the per-event check throttle
+        assert any(c.get(f"/attendees/{i}/current").json()["conversation"] for i in ids)

@@ -30,13 +30,13 @@ def check_invariants(sf, event_id) -> list[str]:
     with sf() as s:
         people = {a.id: a for a in s.scalars(select(Attendee).where(Attendee.event_id == event_id))}
         convs = s.scalars(select(Conversation).where(Conversation.event_id == event_id)).all()
-    active = [p for c in convs if c.status == "active" for p in (c.side_a_attendee_id, c.side_b_attendee_id)]
+    active = [p for c in convs if c.status == "active" for p in (c.person_a_id, c.person_b_id)]
     if len(active) != len(set(active)):
         problems.append("someone is double-booked")
     for pid, p in people.items():
         if (p.status == "in_conversation") != (pid in active):
             problems.append(f"{p.display_name}: status {p.status} disagrees with conversations")
-    pairs = [(c.side_a_attendee_id, c.side_b_attendee_id) for c in convs]
+    pairs = [(c.person_a_id, c.person_b_id) for c in convs]
     if len(pairs) != len(set(pairs)):
         problems.append("a pair met twice")
     return problems

@@ -8,8 +8,6 @@ export function toUser(a: ApiAttendee): User {
     id: a.id,
     token: a.token.toUpperCase(),
     name: a.display_name,
-    side: a.side,
-    sideLabel: a.side_label,
     about: a.offering_text,
     seeking: a.seeking_text,
     interests: a.topics,

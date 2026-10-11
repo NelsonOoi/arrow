@@ -33,10 +33,7 @@ export default function ProfileScreen() {
       {currentUser ? (
         <Card>
           <Text style={text.title}>{currentUser.name}</Text>
-          <Text style={text.small}>
-            {currentUser.sideLabel}
-            {eventName ? ` · ${eventName}` : ''}
-          </Text>
+          {eventName ? <Text style={text.small}>{eventName}</Text> : null}
           <Text style={text.muted}>{currentUser.about}</Text>
           {currentUser.interests.length > 0 ? (
             <Text style={text.small}>{currentUser.interests.join(' · ')}</Text>

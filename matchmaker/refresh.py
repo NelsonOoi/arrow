@@ -21,7 +21,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from matchmaker.clock import Clock
-from matchmaker.matching import blocking_pairs, filter_lists, gale_shapley
+from matchmaker.matching import blocking_pairs, filter_lists, max_weight_pairs, pair_key, stable_roommates
 from matchmaker.models import Attendee, Conversation, Event, PairScore, RefreshRun
 
 log = logging.getLogger(__name__)
@@ -37,7 +37,6 @@ class Conflict(Exception):
 @dataclass(frozen=True)
 class PoolMember:
     id: uuid.UUID
-    side: str
     available_since: datetime
     ref: str = ""  # stable sort key (external_ref, else id); uuids differ between cloned events
 
@@ -45,8 +44,7 @@ class PoolMember:
 @dataclass(frozen=True)
 class TriggerState:
     pending_since: datetime | None  # earliest join among people who joined since the last refresh
-    pending_a: int
-    pending_b: int
+    pending: int
 
 
 def trigger_state(pool: Sequence[PoolMember], last_run_at: datetime | None, last_left_waiting: set[uuid.UUID]) -> TriggerState:
@@ -59,8 +57,7 @@ def trigger_state(pool: Sequence[PoolMember], last_run_at: datetime | None, last
     ]
     return TriggerState(
         pending_since=min((m.available_since for m in pending), default=None),
-        pending_a=sum(1 for m in pending if m.side == "A"),
-        pending_b=sum(1 for m in pending if m.side == "B"),
+        pending=len(pending),
     )
 
 
@@ -68,8 +65,7 @@ def next_fire_at(state: TriggerState, config: Mapping[str, Any]) -> tuple[dateti
     """When the next automatic refresh is due, and why. None when nobody new has joined (the pool is unchanged)."""
     if state.pending_since is None:
         return None
-    k = int(config["refresh_min_per_side"])
-    if state.pending_a >= k and state.pending_b >= k:
+    if state.pending >= int(config["refresh_min_pending"]):
         return state.pending_since, "pool_threshold"
     return state.pending_since + timedelta(seconds=float(config["refresh_window_seconds"])), "window_elapsed"
 
@@ -81,31 +77,46 @@ Lists = dict[uuid.UUID, list[uuid.UUID]]
 
 @dataclass(frozen=True)
 class PolicyInput:
-    lists_a: Lists  # filtered: in pool, unmet, mutually acceptable, frozen order
-    lists_b: Lists
-    proposer_side: str
+    lists: Lists  # filtered: in pool, unmet, mutually acceptable, frozen order
     rng: random.Random
     joined_order: Sequence[uuid.UUID]  # pool ids by available_since, oldest first
     sort_key: Mapping[uuid.UUID, str]  # stable per-person key for any order-dependent policy
 
 
-Policy = Callable[[PolicyInput], dict[uuid.UUID, uuid.UUID]]  # returns {side_a_id: side_b_id}
+@dataclass(frozen=True)
+class Pairing:
+    pairs: dict[uuid.UUID, uuid.UUID]  # symmetric: {x: y, y: x}
+    method: str  # "stable_roommates" is checked for blocking pairs; anything else isn't
 
 
-def gale_shapley_policy(p: PolicyInput) -> dict[uuid.UUID, uuid.UUID]:
-    if p.proposer_side == "A":
-        return gale_shapley(p.lists_a, p.lists_b)
-    return {a: b for b, a in gale_shapley(p.lists_b, p.lists_a).items()}
+Policy = Callable[[PolicyInput], Pairing]
+
+
+def roommates_policy(p: PolicyInput) -> Pairing:
+    """A stable pairing when one exists; otherwise pair as many people as possible by mutual preference.
+
+    Irving's result (and max-weight tie-breaks) depend on processing order, so the algorithms run on each
+    person's stable sort key rather than their uuid; a cloned event then pairs exactly like its source.
+    """
+    by_key = {p.sort_key[x]: x for x in p.lists}
+    keyed = {p.sort_key[x]: [p.sort_key[y] for y in lst] for x, lst in p.lists.items()}
+
+    def back(m: Mapping[str, str]) -> dict[uuid.UUID, uuid.UUID]:
+        return {by_key[x]: by_key[y] for x, y in m.items()}
+
+    stable = stable_roommates(keyed)
+    if stable is not None:
+        return Pairing(back(stable), "stable_roommates")
+    return Pairing(back(max_weight_pairs(keyed)), "max_weight")
 
 
 @dataclass(frozen=True)
 class PolicySpec:
     name: str
     pair: Policy
-    stable: bool  # assert no blocking pairs within the pool
 
 
-DESIGN_POLICY = PolicySpec("design", gale_shapley_policy, stable=True)
+DESIGN_POLICY = PolicySpec("design", roommates_policy)
 
 
 # ---------------------------------------------------------------------------------------------- frozen lists
@@ -131,8 +142,8 @@ def frozen_lists(s: Session, event_id: uuid.UUID) -> tuple[Lists, dict[tuple[uui
 
 
 def _met(s: Session, event_id: uuid.UUID) -> set[tuple[uuid.UUID, uuid.UUID]]:
-    rows = s.execute(text("SELECT side_a_attendee_id, side_b_attendee_id FROM matchmaker.met_pairs WHERE event_id = :e"), {"e": event_id})
-    return {(a, b) for a, b in rows}
+    rows = s.execute(text("SELECT person_a_id, person_b_id FROM matchmaker.met_pairs WHERE event_id = :e"), {"e": event_id})
+    return {(a, b) for a, b in rows}  # already canonical: person_a_id < person_b_id
 
 
 # ---------------------------------------------------------------------------------------------- refresh
@@ -152,18 +163,32 @@ def _last_run(s: Session, event_id: uuid.UUID) -> tuple[datetime | None, set[uui
 
 
 def _pool(s: Session, event_id: uuid.UUID, lock: bool) -> list[PoolMember]:
-    q = select(Attendee.id, Attendee.side, Attendee.available_since, Attendee.external_ref).where(
+    q = select(Attendee.id, Attendee.available_since, Attendee.external_ref).where(
         Attendee.event_id == event_id, Attendee.status == "available"
     ).order_by(Attendee.id)
     if lock:
         q = q.with_for_update()
-    return [PoolMember(i, side, since, ref or str(i)) for i, side, since, ref in s.execute(q)]
+    return [PoolMember(i, since, ref or str(i)) for i, since, ref in s.execute(q)]
 
 
 def due_refresh(s: Session, event_id: uuid.UUID, config: Mapping[str, Any]) -> tuple[datetime, str] | None:
     pool = _pool(s, event_id, lock=False)
     last_at, left, _ = _last_run(s, event_id)
     return next_fire_at(trigger_state(pool, last_at, left), config)
+
+
+def maybe_refresh(sf: sessionmaker[Session], event_id: uuid.UUID, clock: Clock) -> uuid.UUID | None:
+    """Run a refresh if one is due now. The serverless stand-in for Scheduler: requests that already happen
+    (the app polls /current every 3 s) are the clock. Concurrent callers are safe: run_refresh takes the
+    event's advisory lock and re-checks."""
+    with sf() as s:
+        event = s.get(Event, event_id)
+        if event is None or event.status != "live":
+            return None
+        due = due_refresh(s, event_id, event.config)
+    if due is None or due[0] > clock.now():
+        return None
+    return run_refresh(sf, event_id, clock, due[1])
 
 
 def run_refresh(
@@ -199,27 +224,24 @@ def run_refresh(
 
         lists, ranks = frozen_lists(s, event_id)
         met = _met(s, event_id)
-        side = {m.id: m.side for m in pool}
-        pool_a = [m.id for m in pool if m.side == "A"]
-        pool_b = [m.id for m in pool if m.side == "B"]
-        fa, fb = filter_lists(pool_a, pool_b, lists, met)
+        filtered = filter_lists([m.id for m in pool], lists, met)
 
-        proposer = "A" if run_count % 2 == 0 else "B"
         seed = int(config["base_seed"]) * 1_000_003 + run_count
         joined_order = [m.id for m in sorted(pool, key=lambda m: (m.available_since, m.ref))]
         sort_key = {m.id: m.ref for m in pool}
-        pairs = policy.pair(PolicyInput(fa, fb, proposer, random.Random(seed), joined_order, sort_key))
-        if policy.stable:
-            blocking = blocking_pairs(pairs, fa, fb)
+        pairing = policy.pair(PolicyInput(filtered, random.Random(seed), joined_order, sort_key))
+        pairs = pairing.pairs
+        if pairing.method == "stable_roommates":
+            blocking = blocking_pairs(pairs, filtered)
             assert not blocking, f"blocking pairs within the pool: {blocking}"
 
-        paired = set(pairs) | set(pairs.values())
+        paired = set(pairs)
         leftovers = [m.id for m in pool if m.id not in paired]
-        warnings = []
+        warnings: list[dict[str, Any]] = []
+        if pairing.method == "max_weight":
+            warnings.append({"type": "no_stable_pairing"})
         for x in leftovers:
-            has_option = any(
-                x in lists.get(y, ()) and ((x, y) if side[x] == "A" else (y, x)) not in met for y in lists.get(x, ())
-            )
+            has_option = any(x in lists.get(y, ()) and pair_key(x, y) not in met for y in lists.get(x, ()))
             if not has_option:
                 warnings.append({"type": "exhausted", "attendee_id": str(x)})
 
@@ -227,14 +249,14 @@ def run_refresh(
         run = RefreshRun(
             event_id=event_id,
             trigger=trigger,
-            proposer_side=proposer,
             seed=seed,
             pool_snapshot={
-                "pool": [{"id": str(m.id), "side": m.side, "wait_seconds": wait[m.id]} for m in pool],
+                "pool": [{"id": str(m.id), "wait_seconds": wait[m.id]} for m in pool],
                 "left_waiting_ids": [str(x) for x in leftovers],
                 "policy": policy.name,
+                "method": pairing.method,
             },
-            pairs_made=len(pairs),
+            pairs_made=len(pairs) // 2,
             left_waiting=len(leftovers),
             warnings=warnings,
             duration_ms=0,
@@ -242,13 +264,14 @@ def run_refresh(
         )
         s.add(run)
         s.flush()
-        for a, b in sorted(pairs.items(), key=lambda kv: sort_key[kv[0]]):
+        unique_pairs = {pair_key(x, y) for x, y in pairs.items()}
+        for a, b in sorted(unique_pairs, key=lambda ab: min(sort_key[ab[0]], sort_key[ab[1]])):
             s.add(
                 Conversation(
                     event_id=event_id,
                     refresh_run_id=run.id,
-                    side_a_attendee_id=a,
-                    side_b_attendee_id=b,
+                    person_a_id=a,
+                    person_b_id=b,
                     a_rank_of_b=ranks[(a, b)],
                     b_rank_of_a=ranks[(b, a)],
                     a_wait_seconds=wait[a],
@@ -278,7 +301,7 @@ def _lock_attendees(s: Session, ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, Att
 def _active_conversation(s: Session, attendee_id: uuid.UUID, lock: bool = False) -> Conversation | None:
     q = select(Conversation).where(
         Conversation.status == "active",
-        (Conversation.side_a_attendee_id == attendee_id) | (Conversation.side_b_attendee_id == attendee_id),
+        (Conversation.person_a_id == attendee_id) | (Conversation.person_b_id == attendee_id),
     )
     if lock:
         q = q.with_for_update().execution_options(populate_existing=True)
@@ -290,7 +313,7 @@ def _end(conv: Conversation, people: Mapping[uuid.UUID, Attendee], ended_by: uui
     conv.ended_at = now
     conv.ended_by = ended_by
     conv.end_reason = reason
-    for pid in (conv.side_a_attendee_id, conv.side_b_attendee_id):
+    for pid in (conv.person_a_id, conv.person_b_id):
         p = people[pid]
         if p.status == "in_conversation":
             p.status = "available"
@@ -306,9 +329,9 @@ def end_conversation(sf: sessionmaker[Session], conversation_id: uuid.UUID, ende
         conv = s.get(Conversation, conversation_id)
         if conv is None:
             raise LookupError("conversation not found")
-        if ended_by not in (conv.side_a_attendee_id, conv.side_b_attendee_id):
+        if ended_by not in (conv.person_a_id, conv.person_b_id):
             raise Conflict("ended_by must be one of the two people in the conversation")
-        people = _lock_attendees(s, [conv.side_a_attendee_id, conv.side_b_attendee_id])
+        people = _lock_attendees(s, [conv.person_a_id, conv.person_b_id])
         conv = s.execute(
             select(Conversation).where(Conversation.id == conversation_id).with_for_update().execution_options(populate_existing=True)
         ).scalar_one()
@@ -344,7 +367,7 @@ def _set_status(sf: sessionmaker[Session], attendee_id: uuid.UUID, status: str, 
             raise Conflict(f"event is {event.status}; status changes need a live event")
         # Find a partner without locks, then lock both attendee rows in id order, then the conversation.
         conv = _active_conversation(s, attendee_id)
-        ids = [attendee_id] + ([conv.side_a_attendee_id, conv.side_b_attendee_id] if conv else [])
+        ids = [attendee_id] + ([conv.person_a_id, conv.person_b_id] if conv else [])
         people = _lock_attendees(s, ids)
         me = people[attendee_id]
         now = clock.now()
@@ -362,7 +385,7 @@ def _set_status(sf: sessionmaker[Session], attendee_id: uuid.UUID, status: str, 
             return me.event_id, False
         conv = _active_conversation(s, attendee_id, lock=True)
         if conv is not None:
-            if conv.side_a_attendee_id not in people or conv.side_b_attendee_id not in people:
+            if conv.person_a_id not in people or conv.person_b_id not in people:
                 raise _Retry  # a refresh paired us after we looked; roll back and lock the new partner too
             _end(conv, people, attendee_id, "left_event", now)
         me.status = "away"
@@ -382,8 +405,8 @@ def current(sf: sessionmaker[Session], attendee_id: uuid.UUID, clock: Clock) -> 
         out: dict[str, Any] = {"attendee_id": me.id, "status": me.status, "conversation": None, "waiting_seconds": None}
         conv = _active_conversation(s, attendee_id)
         if conv is not None:
-            is_a = conv.side_a_attendee_id == attendee_id
-            partner = s.get(Attendee, conv.side_b_attendee_id if is_a else conv.side_a_attendee_id)
+            is_a = conv.person_a_id == attendee_id
+            partner = s.get(Attendee, conv.person_b_id if is_a else conv.person_a_id)
             out["conversation"] = {
                 "id": conv.id,
                 "partner_id": partner.id,
@@ -408,7 +431,7 @@ def pool_view(sf: sessionmaker[Session], event_id: uuid.UUID, clock: Clock) -> d
             raise LookupError("event not found")
         now = clock.now()
         rows = s.execute(
-            select(Attendee.id, Attendee.display_name, Attendee.side, Attendee.available_since)
+            select(Attendee.id, Attendee.display_name, Attendee.available_since)
             .where(Attendee.event_id == event_id, Attendee.status == "available")
             .order_by(Attendee.available_since)
         ).all()
@@ -420,7 +443,7 @@ def pool_view(sf: sessionmaker[Session], event_id: uuid.UUID, clock: Clock) -> d
             "event_status": event.status,
             "now": now,
             "waiting": [
-                {"id": i, "name": n, "side": side, "waiting_seconds": int((now - since).total_seconds())} for i, n, side, since in rows
+                {"id": i, "name": n, "waiting_seconds": int((now - since).total_seconds())} for i, n, since in rows
             ],
             "active_conversations": active,
             "next_refresh_at": due[0] if due else None,

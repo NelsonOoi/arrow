@@ -1,19 +1,21 @@
 """Flow 1 orchestration: freeze, render cards, enumerate pairs, score with bounded concurrency, aggregate, rank.
 
 Each finished row is committed on its own, so a stopped job resumes where it left off and done rows are
-never re-sent. Only one job per event runs at a time in this process (the app runs a single worker).
+never re-sent. One job per event runs at a time across all processes: a job holds a lease on the event row
+(`precompute_lease_until`) and renews it while it runs, so a crashed job's lease simply expires.
 """
 
 import asyncio
+import contextlib
 import logging
-import threading
+import time
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from matchmaker.cards import Profile, profile_hash
@@ -26,8 +28,8 @@ log = logging.getLogger(__name__)
 MAX_RETRIES = 3
 BACKOFF_BASE_SECONDS = 1.0
 
-_running: set[uuid.UUID] = set()
-_running_lock = threading.Lock()
+LEASE_SECONDS = 60
+RENEW_SECONDS = 20
 
 
 class PrecomputeConflict(Exception):
@@ -35,7 +37,7 @@ class PrecomputeConflict(Exception):
 
 
 def to_profile(a: Attendee) -> Profile:
-    return Profile(a.display_name, a.side, a.seeking_text, a.offering_text, a.avoid_text, dict(a.tags or {}))
+    return Profile(a.display_name, a.seeking_text, a.offering_text, a.avoid_text, dict(a.tags or {}))
 
 
 def prepare(sf: sessionmaker[Session], event_id: uuid.UUID) -> None:
@@ -46,17 +48,16 @@ def prepare(sf: sessionmaker[Session], event_id: uuid.UUID) -> None:
             raise LookupError("event not found")
         if event.status == "draft":
             attendees = s.scalars(select(Attendee).where(Attendee.event_id == event_id)).all()
-            side_a = [a for a in attendees if a.side == "A"]
-            side_b = [a for a in attendees if a.side == "B"]
-            if not side_a or not side_b:
-                raise PrecomputeConflict("both sides need at least one attendee")
+            if len(attendees) < 2:
+                raise PrecomputeConflict("the event needs at least two attendees")
             for a in attendees:
                 a.profile_hash = profile_hash(to_profile(a))
+            # Everyone scores everyone else, in both directions: n * (n - 1) rows.
             rows = [
                 PairScore(event_id=event_id, from_attendee_id=x.id, to_attendee_id=y.id)
-                for xs, ys in ((side_a, side_b), (side_b, side_a))
-                for x in xs
-                for y in ys
+                for x in attendees
+                for y in attendees
+                if x.id != y.id
             ]
             s.add_all(rows)
             event.precompute_total = len(rows)
@@ -79,8 +80,10 @@ async def score_pending(
     concurrency: int = 16,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     limit: int | None = None,
+    deadline: float | None = None,
 ) -> None:
-    """Step 4-5: score every pending row. `limit` stops early (used by tests to simulate an interrupted job)."""
+    """Step 4-5: score every pending row. `limit` stops early (used by tests to simulate an interrupted job).
+    Past `deadline` (a time.monotonic() value), no new rows start; those stay pending for the next run."""
     with sf() as s:
         event = s.get(Event, event_id)
         rubric, config = event.rubric, event.config
@@ -97,6 +100,8 @@ async def score_pending(
 
     async def one(row_id: uuid.UUID, from_id: uuid.UUID, to_id: uuid.UUID) -> None:
         async with sem:
+            if deadline is not None and time.monotonic() >= deadline:
+                return
             attempts = 0
             result: JevResult | None = None
             error: str | None = None
@@ -168,6 +173,41 @@ def finish(sf: sessionmaker[Session], event_id: uuid.UUID) -> str:
         return event.status
 
 
+def claim_lease(sf: sessionmaker[Session], event_id: uuid.UUID, seconds: int = LEASE_SECONDS) -> bool:
+    """Take the event's precompute lease if nobody holds a live one. Uses the database clock, so every
+    instance agrees on expiry."""
+    with sf() as s, s.begin():
+        return (
+            s.execute(
+                text(
+                    "UPDATE matchmaker.events SET precompute_lease_until = now() + make_interval(secs => :s)"
+                    " WHERE id = :id AND (precompute_lease_until IS NULL OR precompute_lease_until < now())"
+                    " RETURNING id"
+                ),
+                {"id": event_id, "s": seconds},
+            ).first()
+            is not None
+        )
+
+
+def _set_lease(sf: sessionmaker[Session], event_id: uuid.UUID, seconds: int | None) -> None:
+    with sf() as s, s.begin():
+        s.execute(
+            text(
+                "UPDATE matchmaker.events SET precompute_lease_until ="
+                " CASE WHEN CAST(:s AS integer) IS NULL THEN NULL ELSE now() + make_interval(secs => :s) END"
+                " WHERE id = :id"
+            ),
+            {"id": event_id, "s": seconds},
+        )
+
+
+async def _keep_lease(sf: sessionmaker[Session], event_id: uuid.UUID) -> None:
+    while True:
+        await asyncio.sleep(RENEW_SECONDS)
+        await asyncio.to_thread(_set_lease, sf, event_id, LEASE_SECONDS)
+
+
 async def run_precompute(
     sf: sessionmaker[Session],
     event_id: uuid.UUID,
@@ -175,23 +215,29 @@ async def run_precompute(
     concurrency: int = 16,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     limit: int | None = None,
+    deadline: float | None = None,
 ) -> str:
-    with _running_lock:
-        if event_id in _running:
-            raise PrecomputeConflict("precompute is already running for this event")
-        _running.add(event_id)
+    """Prepare, score and finish under the event's lease. Returns the event status: `precomputing` means rows
+    are left (deadline, limit or failures) and calling again resumes."""
+    if not claim_lease(sf, event_id):
+        raise PrecomputeConflict("precompute is already running for this event")
+    renew = asyncio.create_task(_keep_lease(sf, event_id))
     try:
         prepare(sf, event_id)
-        await score_pending(sf, event_id, scorer, concurrency, sleep, limit)
+        await score_pending(sf, event_id, scorer, concurrency, sleep, limit, deadline)
         return finish(sf, event_id)
     finally:
-        with _running_lock:
-            _running.discard(event_id)
+        renew.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await renew
+        _set_lease(sf, event_id, None)
 
 
-def is_running(event_id: uuid.UUID) -> bool:
-    with _running_lock:
-        return event_id in _running
+def is_running(sf: sessionmaker[Session], event_id: uuid.UUID) -> bool:
+    with sf() as s:
+        return bool(
+            s.scalar(text("SELECT precompute_lease_until > now() FROM matchmaker.events WHERE id = :id"), {"id": event_id})
+        )
 
 
 def report(sf: sessionmaker[Session], event_id: uuid.UUID) -> dict[str, Any]:
@@ -209,7 +255,7 @@ def report(sf: sessionmaker[Session], event_id: uuid.UUID) -> dict[str, Any]:
         failed = s.scalars(select(PairScore).where(PairScore.event_id == event_id, PairScore.status == "failed")).all()
         return {
             "status": event.status,
-            "running": is_running(event_id),
+            "running": is_running(sf, event_id),
             "total": event.precompute_total,
             "done": event.precompute_done,
             "failed": event.precompute_failed,

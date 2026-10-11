@@ -8,8 +8,6 @@ function attendee(id: string, token: string, topics: string[]): ApiAttendee {
     id,
     external_ref: null,
     display_name: `Person ${id}`,
-    side: 'A',
-    side_label: 'mentee',
     offering_text: 'about',
     seeking_text: 'seeking',
     topics,
@@ -20,7 +18,7 @@ function attendee(id: string, token: string, topics: string[]): ApiAttendee {
 }
 
 function event(id: string, status: ApiEvent['status']): ApiEvent {
-  return { id, name: id, status, side_a_label: 'mentee', side_b_label: 'mentor' };
+  return { id, name: id, status };
 }
 
 describe('roster lookups', () => {

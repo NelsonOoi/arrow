@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     scorer: str = "fake"  # fake | jev
     jev_model: str = "jev-1.13.0"
     precompute_concurrency: int = 16
+    # On Vercel (which sets VERCEL=1): no client-side pool, and DATABASE_URL is the transaction pooler (6543).
+    vercel: bool = False
+    host_key: str | None = None  # when set, setup endpoints require `Authorization: Bearer <host_key>`
+    max_duration_seconds: int = 300  # the function's maxDuration on Vercel; long work stops ~30 s before it
 
 
 @lru_cache
@@ -25,7 +29,7 @@ DEFAULT_CONFIG = {
     "dealbreaker_threshold": 0.5,
     "low_confidence_threshold": 0.5,
     "refresh_window_seconds": 20,
-    "refresh_min_per_side": 3,
+    "refresh_min_pending": 6,  # new joiners since the last refresh that fire one early
     "base_seed": 42,
 }
 

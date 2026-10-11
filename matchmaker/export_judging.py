@@ -48,7 +48,7 @@ def _key(path: Path) -> dict[str, Any]:
 def _planted(key) -> list[tuple[str, str, str]]:
     out = [(t["seeker"], t["candidate"], "dealbreaker_trap") for t in key["dealbreaker_traps"]]
     out += [(d["seeker"], d["candidate"], "keyword_decoy") for d in key["keyword_decoys"]]
-    # Pad to 10 with the rejecting direction of one-sided pairs (B clearly doesn't want A).
+    # Pad to 10 with the rejecting direction of one-sided pairs (the wanted person clearly doesn't want them back).
     out += [(o["wanted"], o["wants"], "one_sided_reverse") for o in key["one_sided"]]
     return out[:10]
 

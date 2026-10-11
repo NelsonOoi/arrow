@@ -61,8 +61,6 @@ def clone_event(sf: sessionmaker[Session], src_event_id: uuid.UUID, name: str) -
             name=name,
             rubric=src.rubric,
             config=src.config,
-            side_a_label=src.side_a_label,
-            side_b_label=src.side_b_label,
             model_version=src.model_version,
             status="live",
             precompute_total=src.precompute_total,
@@ -76,8 +74,8 @@ def clone_event(sf: sessionmaker[Session], src_event_id: uuid.UUID, name: str) -
             text(
                 """
                 INSERT INTO matchmaker.attendees
-                  (event_id, external_ref, display_name, side, seeking_text, offering_text, avoid_text, tags, profile_hash)
-                SELECT :new, external_ref, display_name, side, seeking_text, offering_text, avoid_text, tags, profile_hash
+                  (event_id, external_ref, display_name, seeking_text, offering_text, avoid_text, tags, profile_hash)
+                SELECT :new, external_ref, display_name, seeking_text, offering_text, avoid_text, tags, profile_hash
                 FROM matchmaker.attendees WHERE event_id = :src
                 """
             ),
@@ -152,14 +150,15 @@ def simulate(
     def elapsed() -> float:
         return (clock.now() - start).total_seconds()
 
+    ref_of = {i: r for i, r in people}
+
     def schedule_ends(run_id: uuid.UUID) -> None:
         with sf() as s:
-            convs = s.execute(
-                select(Conversation.id, Conversation.side_a_attendee_id, Conversation.side_b_attendee_id)
-                .join(Attendee, Attendee.id == Conversation.side_a_attendee_id)
-                .where(Conversation.refresh_run_id == run_id)
-                .order_by(Attendee.external_ref)
+            rows = s.execute(
+                select(Conversation.id, Conversation.person_a_id, Conversation.person_b_id).where(Conversation.refresh_run_id == run_id)
             ).all()
+        # person_a/person_b follow uuid order, which differs between clones; order by external ref instead.
+        convs = sorted(((cid, *sorted((x, y), key=ref_of.get)) for cid, x, y in rows), key=lambda c: ref_of[c[1]])
         for cid, a, b in convs:
             length = conv_rng.lognormvariate(mu, sim.conversation_sigma)
             push(elapsed() + length, "end", (cid, a if conv_rng.random() < 0.5 else b))
@@ -229,15 +228,16 @@ def _metrics(sf, event_id, clock, answer_key) -> tuple[dict[str, Any], list[dict
     ranks = [c.a_rank_of_b for c in convs] + [c.b_rank_of_a for c in convs]
     per_person = {i: 0 for i in ref}
     for c in convs:
-        per_person[c.side_a_attendee_id] += 1
-        per_person[c.side_b_attendee_id] += 1
-    met = {(ref[c.side_a_attendee_id], ref[c.side_b_attendee_id]) for c in convs}
+        per_person[c.person_a_id] += 1
+        per_person[c.person_b_id] += 1
+    met = {frozenset((c.person_a_id, c.person_b_id)) for c in convs}
+    by_ref = {r: i for i, r in ref.items()}
 
     double_booked = 0
     by_person: dict[uuid.UUID, list[tuple]] = {}
     for c in convs:
         span = (c.started_at, c.ended_at or now)
-        for p in (c.side_a_attendee_id, c.side_b_attendee_id):
+        for p in (c.person_a_id, c.person_b_id):
             by_person.setdefault(p, []).append(span)
     for spans in by_person.values():
         spans.sort()
@@ -253,28 +253,32 @@ def _metrics(sf, event_id, clock, answer_key) -> tuple[dict[str, Any], list[dict
         "open_waits_at_end": len(open_waits),
         "conversations_per_person": statistics.mean(per_person.values()) if per_person else 0,
         "mean_partner_rank": statistics.mean(ranks) if ranks else None,
-        "obvious_pairs_met": sum(1 for a, b in obvious if (a, b) in met or (b, a) in met),
+        "obvious_pairs_met": sum(1 for a, b in obvious if frozenset((by_ref.get(a), by_ref.get(b))) in met),
         "obvious_pairs_total": len(obvious),
         "double_booked": double_booked,
         "repeat_pairs": len(convs) - len(met),
         "exhausted_warnings": sum(1 for r in runs for w in r.warnings if w.get("type") == "exhausted"),
     }
-    convs = sorted(convs, key=lambda c: (c.started_at, ref[c.side_a_attendee_id]))
-    rows = [
-        {
-            "conversation_id": str(c.id),
-            "a_ref": ref[c.side_a_attendee_id],
-            "b_ref": ref[c.side_b_attendee_id],
-            "a_rank_of_b": c.a_rank_of_b,
-            "b_rank_of_a": c.b_rank_of_a,
-            "a_wait_seconds": c.a_wait_seconds,
-            "b_wait_seconds": c.b_wait_seconds,
-            "started_at": c.started_at.isoformat(),
-            "ended_at": c.ended_at.isoformat() if c.ended_at else None,
-            "end_reason": c.end_reason,
-        }
-        for c in convs
-    ]
+    rows = []
+    for c in convs:
+        # Orient each row by external ref so it reads the same across cloned events.
+        flip = ref[c.person_a_id] > ref[c.person_b_id]
+        a, b = (c.person_b_id, c.person_a_id) if flip else (c.person_a_id, c.person_b_id)
+        rows.append(
+            {
+                "conversation_id": str(c.id),
+                "a_ref": ref[a],
+                "b_ref": ref[b],
+                "a_rank_of_b": c.b_rank_of_a if flip else c.a_rank_of_b,
+                "b_rank_of_a": c.a_rank_of_b if flip else c.b_rank_of_a,
+                "a_wait_seconds": c.b_wait_seconds if flip else c.a_wait_seconds,
+                "b_wait_seconds": c.a_wait_seconds if flip else c.b_wait_seconds,
+                "started_at": c.started_at.isoformat(),
+                "ended_at": c.ended_at.isoformat() if c.ended_at else None,
+                "end_reason": c.end_reason,
+            }
+        )
+    rows.sort(key=lambda r: (r["started_at"], r["a_ref"]))
     return metrics, rows
 
 

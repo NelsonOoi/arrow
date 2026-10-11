@@ -12,7 +12,6 @@ from typing import Any
 @dataclass(frozen=True)
 class Profile:
     display_name: str
-    side: str
     seeking_text: str
     offering_text: str
     avoid_text: str
@@ -39,7 +38,7 @@ def candidate_half(p: Profile) -> str:
 
 
 def render_card(p: Profile) -> str:
-    return f"{p.display_name} (side {p.side})\n{seeker_half(p)}\n{candidate_half(p)}"
+    return f"{p.display_name}\n{seeker_half(p)}\n{candidate_half(p)}"
 
 
 def profile_hash(p: Profile) -> str:
