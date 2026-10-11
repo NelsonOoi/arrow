@@ -1,16 +1,21 @@
+export type Side = 'A' | 'B';
+
+/** One attendee of the live event, loaded from the matchmaker's `GET /events/{id}/attendees`. */
 export type User = {
+  /** Matchmaker attendee UUID. */
   id: string;
-  /** 4 characters, A-Z and 0-9. Advertised over BLE as `${LOCAL_NAME_PREFIX}${token}`. */
+  /** 4 characters, A-Z and 0-9, assigned by the matchmaker. Advertised over BLE as `${LOCAL_NAME_PREFIX}${token}`. */
   token: string;
   name: string;
-  role: string;
-  company: string;
-  /** Lowercase phrase that completes "is working on …" and "ask about …". */
-  workingOn: string;
-  /** Lowercase phrase that completes "looking for …". */
-  lookingFor: string;
+  side: Side;
+  /** The event's name for this side, e.g. "mentee" or "mentor". */
+  sideLabel: string;
+  /** What they offer, shown to the people they're paired with. */
+  about: string;
+  /** What they're looking for. */
+  seeking: string;
   interests: string[];
-  matchIds: string[];
+  goals: string[];
 };
 
 export type TokenSource = 'localName' | 'gatt';

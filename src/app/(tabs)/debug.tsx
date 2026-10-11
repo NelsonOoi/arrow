@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { API_URL } from '@/api/client';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Pill';
@@ -139,6 +140,7 @@ export default function DebugScreen() {
           Status {status} · threshold {threshold} dBm · {sortedPeers.length} peers ·{' '}
           {sampleCount} samples logged
         </Text>
+        <Text style={text.mono}>matchmaker {API_URL}</Text>
       </Card>
 
       <View style={styles.buttons}>

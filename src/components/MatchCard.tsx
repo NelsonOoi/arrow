@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
-import { firstName, isMutual, matchColor, sharedInterests } from '@/data/users';
+import { firstName, matchColor, sharedInterests } from '@/data/users';
 import { colors, font, radius, spacing } from '@/theme';
 import type { PeerState, User } from '@/types';
 
@@ -11,6 +11,8 @@ type MatchCardProps = {
   match: User;
   peer?: PeerState;
   met?: boolean;
+  /** Where this match sat on your precomputed list, 1 = top pick. */
+  rank?: number;
   onFind: () => void;
 };
 
@@ -25,18 +27,18 @@ function proximityLabel(peer: PeerState | undefined): { label: string; near: boo
   return { label: 'Not detected yet', near: false };
 }
 
-export function MatchCard({ me, match, peer, met = false, onFind }: MatchCardProps) {
+export function MatchCard({ me, match, peer, met = false, rank, onFind }: MatchCardProps) {
   const first = firstName(match);
   const shared = sharedInterests(me, match);
   const proximity = proximityLabel(peer);
 
-  let summary = `${first} is working on ${match.workingOn}.`;
+  let summary = match.about;
   if (shared.length > 0) summary += ` You're both into ${joinList(shared)}.`;
 
   return (
     <View style={styles.card}>
       <Text style={styles.eyebrow}>
-        {isMutual(me, match) ? `★ It's mutual: ${first} wants to meet you too` : 'Suggested for you'}
+        {rank ? `Your #${rank} pick` : 'Matched for you'}
       </Text>
 
       <View style={styles.identity}>
@@ -45,16 +47,18 @@ export function MatchCard({ me, match, peer, met = false, onFind }: MatchCardPro
           <Text style={styles.name} numberOfLines={1}>
             {match.name}
           </Text>
-          <Text style={styles.role} numberOfLines={1}>
-            {match.role} · {match.company}
-          </Text>
+          {match.goals.length > 0 ? (
+            <Text style={styles.role} numberOfLines={1}>
+              {match.goals.join(' · ')}
+            </Text>
+          ) : null}
         </View>
       </View>
 
       <Text style={styles.summary}>{summary}</Text>
 
       <View style={styles.facts}>
-        <Fact label="Looking for" value={match.lookingFor} />
+        <Fact label="Looking for" value={match.seeking} />
         <Fact label="Into" value={match.interests.join(', ')} />
         <Fact
           label="Right now"

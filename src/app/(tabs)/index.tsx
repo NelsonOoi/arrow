@@ -9,8 +9,9 @@ import { Screen } from '@/components/Screen';
 import { SignalMeter } from '@/components/SignalMeter';
 import { StatusBanner } from '@/components/StatusBanner';
 import { text } from '@/components/typography';
-import { getMatches, getUserById, matchColor } from '@/data/users';
+import { getUserById, matchColor } from '@/data/users';
 import { useSignal } from '@/proximity/useSignal';
+import { useLive } from '@/store/live';
 import { useRadar } from '@/store/radar';
 import { useSession } from '@/store/session';
 import { colors, font, radius, spacing } from '@/theme';
@@ -23,12 +24,12 @@ function KeepAwake() {
 
 function headline(scanning: boolean, status: RadarStatus): { title: string; detail: string } {
   if (!scanning) {
-    return { title: 'Scanning is off', detail: 'Turn it on to see which matches are around.' };
+    return { title: 'Scanning is off', detail: 'Turn it on to see if your match is around.' };
   }
   if (status === 'starting') return { title: 'Starting Bluetooth…', detail: 'One moment.' };
   return {
-    title: 'Scanning for your matches',
-    detail: 'Your phone buzzes when one gets close. Tap a match to find them.',
+    title: 'Scanning for your match',
+    detail: 'Your phone buzzes when they get close. Tap your match to find them.',
   };
 }
 
@@ -39,10 +40,10 @@ export default function NearbyScreen() {
   const status = useRadar((s) => s.status);
   const error = useRadar((s) => s.error);
   const peers = useRadar((s) => s.peers);
+  const partner = useLive((s) => getUserById(s.conversation?.partnerId));
 
   if (!currentUser) return null;
-  const matches = getMatches(currentUser);
-  const inRange = matches.filter((m) => peers[m.token]).length;
+  const inRange = partner ? partner.token in peers : false;
   const { title, detail } = headline(scanning, status);
   const problem = status === 'denied' || status === 'poweredOff' || status === 'error';
 
@@ -72,20 +73,21 @@ export default function NearbyScreen() {
       {problem ? <StatusBanner status={status} error={error} /> : null}
 
       <Text style={[text.section, styles.sectionTitle]}>
-        Your matches{scanning ? ` · ${inRange} in range` : ''}
+        Your match{scanning && partner ? ` · ${inRange ? 'in range' : 'not in range'}` : ''}
       </Text>
-      <View style={styles.list}>
-        {matches.map((match, i) => (
+      {partner ? (
+        <View style={styles.list}>
           <MatchRow
-            key={match.id}
             me={currentUser}
-            match={match}
-            peer={peers[match.token]}
+            match={partner}
+            peer={peers[partner.token]}
             scanning={scanning}
-            divider={i > 0}
+            divider={false}
           />
-        ))}
-      </View>
+        </View>
+      ) : (
+        <Text style={text.muted}>No match yet. Check in on the Match tab to get paired.</Text>
+      )}
     </Screen>
   );
 }

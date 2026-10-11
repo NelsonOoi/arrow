@@ -12,6 +12,7 @@ import {
   RSSI_THRESHOLD_STEP,
 } from '@/ble/constants';
 import { getUserById } from '@/data/users';
+import { useRoster } from '@/store/roster';
 import { useSession } from '@/store/session';
 import { spacing } from '@/theme';
 
@@ -20,6 +21,7 @@ export default function ProfileScreen() {
   const threshold = useSession((s) => s.threshold);
   const setThreshold = useSession((s) => s.setThreshold);
   const setScanning = useSession((s) => s.setScanning);
+  const eventName = useRoster((s) => s.event?.name);
 
   const switchIdentity = () => {
     setScanning(false);
@@ -31,10 +33,14 @@ export default function ProfileScreen() {
       {currentUser ? (
         <Card>
           <Text style={text.title}>{currentUser.name}</Text>
-          <Text style={text.muted}>
-            {currentUser.role} @ {currentUser.company}
+          <Text style={text.small}>
+            {currentUser.sideLabel}
+            {eventName ? ` · ${eventName}` : ''}
           </Text>
-          <Text style={text.small}>{currentUser.interests.join(' · ')}</Text>
+          <Text style={text.muted}>{currentUser.about}</Text>
+          {currentUser.interests.length > 0 ? (
+            <Text style={text.small}>{currentUser.interests.join(' · ')}</Text>
+          ) : null}
           <Text style={text.mono}>Token {currentUser.token}</Text>
         </Card>
       ) : null}

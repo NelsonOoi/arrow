@@ -1,0 +1,31 @@
+{
+  "_note": "Planted cases for blind judging. Drafted by Claude; edit before running precompute. Refs are seed-file ids (external_ref).",
+  "obvious_pairs": [
+    ["a01", "b01"],
+    ["a02", "b02"],
+    ["a03", "b03"],
+    ["a04", "b04"],
+    ["a05", "b05"],
+    ["a06", "b06"]
+  ],
+  "dealbreaker_traps": [
+    {"seeker": "a07", "candidate": "b07", "why": "strong fundraising fit, but b07's background is a crypto and blockchain fund, which a07 avoids"},
+    {"seeker": "a08", "candidate": "b08", "why": "strong platform-hiring fit, but b08 works at Ledgerly, a08's named competitor"},
+    {"seeker": "a09", "candidate": "b09", "why": "strong paid-acquisition fit, but b09 recently promoted a betting and casino app"},
+    {"seeker": "a10", "candidate": "b10", "why": "good product fit, but b10 is now a recruiter looking to place PMs"}
+  ],
+  "keyword_decoys": [
+    {"seeker": "a11", "candidate": "b11", "why": "both talk about hiring a marketer; b11 needs the same help"},
+    {"seeker": "a12", "candidate": "b12", "why": "'python' means the snake to b12"},
+    {"seeker": "a13", "candidate": "b13", "why": "acquisition overlap, but b13 is a buyer who has never sold a company; b20 is the real fit"},
+    {"seeker": "a14", "candidate": "b14", "why": "sales and hiring words overlap, but b14 is a job-seeking AE, not a sales leader"}
+  ],
+  "paraphrase_twins": [
+    ["a15", "a16"]
+  ],
+  "one_sided": [
+    {"wants": "a17", "wanted": "b15", "why": "b15 only mentors people with production ML experience; a17 has none"},
+    {"wants": "a18", "wanted": "b16", "why": "b16 wants Series A hardware companies with revenue; a18 is a hobbyist"},
+    {"wants": "a19", "wanted": "b17", "why": "b17 wants designers with a strong portfolio; a19 has none"}
+  ]
+}

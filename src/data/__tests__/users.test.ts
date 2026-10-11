@@ -1,59 +1,74 @@
+import { pickEvent, type ApiAttendee, type ApiEvent } from '@/api/client';
 import { TOKEN_PATTERN } from '@/ble/constants';
-import { getMatches, getUserById, getUserByToken, matchColor, USERS } from '@/data/users';
+import { getUserById, getUserByToken, matchColor, sharedInterests } from '@/data/users';
+import { toUser, useRoster } from '@/store/roster';
 
-describe('USERS', () => {
-  it('has unique ids', () => {
-    const ids = USERS.map((u) => u.id);
-    expect(new Set(ids).size).toBe(ids.length);
+function attendee(id: string, token: string, topics: string[]): ApiAttendee {
+  return {
+    id,
+    external_ref: null,
+    display_name: `Person ${id}`,
+    side: 'A',
+    side_label: 'mentee',
+    offering_text: 'about',
+    seeking_text: 'seeking',
+    topics,
+    goals: [],
+    token,
+    status: 'registered',
+  };
+}
+
+function event(id: string, status: ApiEvent['status']): ApiEvent {
+  return { id, name: id, status, side_a_label: 'mentee', side_b_label: 'mentor' };
+}
+
+describe('roster lookups', () => {
+  const a = toUser(attendee('u1', 'a7k2', ['fintech', 'b2b saas']));
+  const b = toUser(attendee('u2', 'B3QX', ['b2b saas', 'hiring']));
+
+  beforeAll(() => {
+    useRoster.setState({
+      status: 'ready',
+      users: [a, b],
+      byId: new Map([a, b].map((u) => [u.id, u])),
+      byToken: new Map([a, b].map((u) => [u.token, u])),
+    });
   });
 
-  it('has unique 4-character A-Z/0-9 tokens', () => {
-    const tokens = USERS.map((u) => u.token);
-    expect(new Set(tokens).size).toBe(tokens.length);
-    for (const token of tokens) {
-      expect(token).toMatch(/^[A-Z0-9]{4}$/);
-      expect(token).toMatch(TOKEN_PATTERN);
-    }
+  it('normalizes tokens to the BLE format', () => {
+    expect(a.token).toBe('A7K2');
+    expect(a.token).toMatch(TOKEN_PATTERN);
   });
 
-  it('only lists existing users as matches, never self', () => {
-    for (const user of USERS) {
-      for (const id of user.matchIds) {
-        expect(getUserById(id)).toBeDefined();
-        expect(id).not.toBe(user.id);
-      }
-      expect(getMatches(user)).toHaveLength(user.matchIds.length);
-    }
-  });
-
-  it('has symmetric matches', () => {
-    for (const user of USERS) {
-      for (const id of user.matchIds) {
-        expect({ pair: [user.id, id], symmetric: getUserById(id)!.matchIds.includes(user.id) }).toEqual({
-          pair: [user.id, id],
-          symmetric: true,
-        });
-      }
-    }
-  });
-
-  it('gives both sides of a match the same color, unique among each person’s matches', () => {
-    for (const user of USERS) {
-      const matches = getMatches(user);
-      for (const match of matches) {
-        expect(matchColor(user, match)).toBe(matchColor(match, user));
-      }
-      const colors = matches.map((m) => matchColor(user, m));
-      expect(new Set(colors).size).toBe(colors.length);
-    }
+  it('gives both sides of a match the same color', () => {
+    expect(matchColor(a, b)).toBe(matchColor(b, a));
   });
 
   it('resolves users by id and token', () => {
-    for (const user of USERS) {
-      expect(getUserById(user.id)).toBe(user);
-      expect(getUserByToken(user.token)).toBe(user);
-    }
+    expect(getUserById('u1')).toBe(a);
+    expect(getUserByToken('B3QX')).toBe(b);
+    expect(getUserByToken('a7k2')).toBe(a);
     expect(getUserById(null)).toBeUndefined();
     expect(getUserByToken('ZZZZ')).toBeUndefined();
+  });
+
+  it('finds shared interests', () => {
+    expect(sharedInterests(a, b)).toEqual(['b2b saas']);
+  });
+});
+
+describe('pickEvent', () => {
+  const events = [event('new-draft', 'draft'), event('ready', 'ready'), event('live', 'live'), event('old-live', 'live')];
+
+  it('prefers the newest live event, then a ready one', () => {
+    expect(pickEvent(events, null)?.id).toBe('live');
+    expect(pickEvent(events.filter((e) => e.status !== 'live'), null)?.id).toBe('ready');
+    expect(pickEvent([event('d', 'draft')], null)).toBeUndefined();
+  });
+
+  it('honours a pinned event id', () => {
+    expect(pickEvent(events, 'new-draft')?.id).toBe('new-draft');
+    expect(pickEvent(events, 'missing')).toBeUndefined();
   });
 });
