@@ -9,11 +9,12 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.arrow.app",
+      "bundleIdentifier": "com.speedhacks.arrow",
       "supportsTablet": false,
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Arrow uses Bluetooth to detect matched attendees who are physically near you.",
-        "NSBluetoothPeripheralUsageDescription": "Arrow uses Bluetooth so matched attendees near you can detect you."
+        "NSBluetoothPeripheralUsageDescription": "Arrow uses Bluetooth so matched attendees near you can detect you.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
