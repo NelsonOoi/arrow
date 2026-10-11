@@ -1,6 +1,9 @@
-// Arrow on Cloudflare Workers: host dashboard at /, guest page at /m/<token>,
-// JSON API under /api (events live at /api/gatherings: ad blockers block anything under
-// /api/events as analytics). Data in Supabase, calls and texts through Dial, scoring by Jev.
+// Arrow's JSON API under /api, run on Vercel by server.js (events live at /api/gatherings: ad blockers
+// block anything under /api/events as analytics). The pages in public/ (host dashboard at /, guest page at
+// /m/<token>) are served statically. Data in Supabase, calls and texts through Dial, matching by the Python
+// matchmaker (or Jev directly in match.js).
+import { generateText, Output } from "ai";
+import { z } from "zod";
 import { placeCall, getCall, sendSms, listMessages } from "./dial.js";
 import { computeMatches, profile } from "./match.js";
 import { select, first as firstRow, insert, update, remove, v, inList } from "./db.js";
@@ -75,6 +78,11 @@ Keep the whole call under 2 minutes. Never ask for email, address, or anything n
 const smsQuestions = (event, person) =>
   `Hi${first(person.name)}! We tried calling for ${event.name} — we find you the person you should meet there. Reply with quick answers:\n${questionsFor(event).map((q, i) => `${i + 1}) ${q.question}`).join("\n")}`;
 
+// A small model on Vercel AI Gateway pulls short answers out of a call transcript or SMS reply.
+// Auth: Vercel OIDC on deployments, AI_GATEWAY_API_KEY elsewhere. Without either, only parseAnswers runs.
+const EXTRACT_MODEL = "anthropic/claude-haiku-5.5"; // override with AI_GATEWAY_MODEL
+const hasGateway = (env) => !!(env.VERCEL || env.AI_GATEWAY_API_KEY || env.VERCEL_OIDC_TOKEN);
+
 // Which agent question a transcript line is asking, by keyword.
 const CUES = {
   position: /role|position/i,
@@ -115,27 +123,22 @@ function parseAnswers(qs, text) {
   return out;
 }
 
-// Pull short answers out of a call transcript or SMS reply: Workers AI first,
+// Pull short answers out of a call transcript or SMS reply: the AI Gateway model first,
 // with any gaps filled by parseAnswers.
 async function extractAnswers(env, event, text) {
   const qs = questionsFor(event);
   const parsed = parseAnswers(qs, text);
   let ai = {};
-  if (text && env.AI) {
+  if (text && hasGateway(env)) {
     try {
-      const out = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
-        messages: [
-          { role: "system", content: "You extract a guest's answers from an event intake phone call or text reply. Use the guest's own words, shortened to a phrase. Use null if they never answered that question." },
-          { role: "user", content: `Questions:\n${qs.map((q) => `- ${q.key}: ${q.question}`).join("\n")}\n\nConversation:\n"""\n${text.slice(0, 8000)}\n"""` },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: { type: "object", properties: Object.fromEntries(qs.map((q) => [q.key, { type: ["string", "null"] }])), required: qs.map((q) => q.key) },
-        },
-        max_tokens: 400,
+      const { output } = await generateText({
+        model: env.AI_GATEWAY_MODEL || EXTRACT_MODEL,
+        instructions: "You extract a guest's answers from an event intake phone call or text reply. Use the guest's own words, shortened to a phrase. Use null if they never answered that question.",
+        prompt: `Questions:\n${qs.map((q) => `- ${q.key}: ${q.question}`).join("\n")}\n\nConversation:\n"""\n${text.slice(0, 8000)}\n"""`,
+        output: Output.object({ schema: z.object(Object.fromEntries(qs.map((q) => [q.key, z.string().nullable()]))) }),
+        maxOutputTokens: 400,
       });
-      const r = out.response;
-      ai = typeof r === "string" ? JSON.parse(r.slice(r.indexOf("{"), r.lastIndexOf("}") + 1)) : r ?? {};
+      ai = output ?? {};
     } catch (e) {
       console.warn("AI extraction failed, using parser", e.message);
     }
@@ -257,7 +260,7 @@ route("POST", "/api/gatherings", async (req, env) => {
   return ev;
 });
 
-route("GET", "/api/gatherings/:id", async (req, env, { id }) => {
+route("GET", "/api/gatherings/:id", async (req, env, { id }, ctx) => {
   let event = await getEvent(env, id);
   try {
     await tick(env, event);
@@ -265,6 +268,9 @@ route("GET", "/api/gatherings/:id", async (req, env, { id }) => {
     await log(env, id)(`Call queue error: ${e.message}`);
   }
   event = await getEvent(env, id);
+  // A matchmaker run that stopped at its deadline or died goes quiet: this poll restarts it.
+  if (["requested", "running"].includes(event.mm_status) && (!event.mm_heartbeat_at || Date.now() - Date.parse(event.mm_heartbeat_at) > MM_STALE_MS))
+    kickMatchmaker(env, ctx, id);
   const [list, matched, logs] = await Promise.all([
     select(env, `people?event_id=eq.${v(id)}&order=created_at,uid`),
     select(env, `matches?event_id=eq.${v(id)}&select=uid`),
@@ -367,9 +373,23 @@ route("POST", "/api/gatherings/:id/reextract", async (req, env, { id }) => {
   return { transcripts: people.length, filled };
 });
 
-route("POST", "/api/gatherings/:id/match", async (req, env, { id }) => {
+route("POST", "/api/gatherings/:id/match", async (req, env, { id }, ctx) => {
   const event = await getEvent(env, id);
   const people = await select(env, `people?event_id=eq.${v(id)}&status=eq.answered`);
+  // MATCHER=matchmaker hands off to the Python matchmaker; on Vercel the service binding implies it.
+  if ((env.MATCHER ?? (env.MATCHMAKER_URL ? "matchmaker" : "local")) === "matchmaker") {
+    // Hand off to the Python matchmaker (matchmaker/web_bridge.py), which runs Jev precompute and writes
+    // `matches` itself. The dashboard shows its progress from mm_done / mm_total.
+    if (people.length < 2) throw new HttpError(400, "Need at least 2 people who answered");
+    if (["requested", "running"].includes(event.mm_status)) throw new HttpError(409, "Matching is already running");
+    await update(env, `events?id=eq.${v(id)}`, {
+      mm_status: "requested", mm_event_id: null, mm_error: null, mm_done: 0, mm_total: people.length * (people.length - 1),
+      mm_requested_at: new Date().toISOString(),
+    });
+    await log(env, id)(`Sent ${people.length} guests to the matchmaker`);
+    kickMatchmaker(env, ctx, id);
+    return { queued: people.length };
+  }
   const rows = await computeMatches(env, event, people, log(env, id));
   await remove(env, `matches?event_id=eq.${v(id)}`);
   await insert(env, "matches", rows.map((r) => ({ event_id: id, rank: 1, ...r, must_meet: !!r.must_meet })));
@@ -394,6 +414,21 @@ route("POST", "/api/gatherings/:id/send-links", async (req, env, { id }) => {
   await log(env, id)(`Links sent: ${sent}/${people.length}${isDemo(env) ? " · demo mode: not actually texted" : ""}`);
   return { sent };
 });
+
+// The matchmaker runs as a sibling service; MATCHMAKER_URL comes from the service binding in vercel.json.
+// waitUntil keeps this function alive while it works. Without the binding (matchmaker on a laptop under
+// uvicorn), the matchmaker polls the events table for requests instead.
+const MM_STALE_MS = 45000; // matches web_bridge.STALE_SECONDS
+function kickMatchmaker(env, ctx, id) {
+  if (!env.MATCHMAKER_URL) return;
+  const url = new URL(`bridge/${encodeURIComponent(id)}`, env.MATCHMAKER_URL.replace(/\/?$/, "/"));
+  const headers = env.HOST_KEY ? { authorization: `Bearer ${env.HOST_KEY}` } : {};
+  ctx.waitUntil(
+    fetch(url, { method: "POST", headers })
+      .then(async (r) => r.ok || console.warn(`matchmaker /bridge ${r.status}: ${(await r.text()).slice(0, 200)}`))
+      .catch((e) => console.warn(`matchmaker /bridge failed: ${e.message}`)),
+  );
+}
 
 // ---------- guest API ----------
 async function guestByToken(env, token) {
@@ -464,8 +499,6 @@ export default {
         return json({ error: e.message }, e.status ?? 500);
       }
     }
-    if (url.pathname === "/" || url.pathname === "/host") return env.ASSETS.fetch(new URL("/host", url));
-    if (url.pathname.startsWith("/m/")) return env.ASSETS.fetch(new URL("/m", url));
-    return env.ASSETS.fetch(req);
+    return json({ error: "not found" }, 404); // pages are static files, served before this function runs
   },
 };
