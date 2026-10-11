@@ -9,7 +9,7 @@ Live (Cloudflare, before the move to Vercel): **https://arrow.sunisgreat1.worker
 
 ## Stack
 
-The `web` service of the repo's Vercel project ([../vercel.json](../vercel.json)). [server.js](server.js) runs the JSON API router in [src/worker.js](src/worker.js), and the pages in `public/` are static files (`/` → `host.html`, `/m/*` → `m.html`).
+Part of the repo's Vercel project ([../vercel.json](../vercel.json)). `/api/*` goes to the [../api/web.mjs](../api/web.mjs) function, which runs [server.js](server.js) and the JSON API router in [src/worker.js](src/worker.js). The pages in `public/` are static files (`/` → `host.html`, `/m/*` → `m.html`).
 
 | Piece | Uses |
 |---|---|
@@ -24,7 +24,7 @@ The `web` service of the repo's Vercel project ([../vercel.json](../vercel.json)
 |---|---|---|
 | 1. Guests | Add guests | Paste `name, phone`, one per line |
 | 2. AI calls | Call everyone | Calls one guest at a time (a Dial number carries one call). Each dashboard poll finishes the current call and starts the next. No answer → the questions go out by text; the inbox icon pulls replies in. |
-| 3. Match | Run matching | With the matchmaker service bound (or `MATCHER=matchmaker`), hands the guests who answered to the Python matchmaker (see below). Otherwise [src/match.js](src/match.js) scores every pair with Jev and pairs them greedily. Either way: one `matches` row per guest, `rank = 1`, `must_meet` for mutual pairs. |
+| 3. Match | Run matching | On Vercel (or with `MATCHER=matchmaker`), hands the guests who answered to the Python matchmaker (see below). Otherwise [src/match.js](src/match.js) scores every pair with Jev and pairs them greedily. Either way: one `matches` row per guest, `rank = 1`, `must_meet` for mutual pairs. |
 | 4. Links | Text links | Texts each guest `/m/<token>` |
 | 5. Find | Guest page | "Find X" makes both phones flash the same color until one taps "found" |
 
@@ -47,11 +47,11 @@ Tables: run [schema.sql](schema.sql) once in the Supabase SQL editor.
 
 Demo data: `node seed.mjs` (reads the key from `~/.config/arrow/supabase.key`), then **Run matching**.
 
-Local dev: `npx vercel dev` from the repo root runs this service (through [dev.js](dev.js)) and the matchmaker together. It talks to the same Supabase project.
+Local dev: `npx vercel dev` from the repo root runs the static pages and both functions together, or `node dev.js` in `web/` runs just this side. Both talk to the same Supabase project.
 
 ## Matchmaker handoff
 
-**Run matching** sets `events.mm_status = 'requested'` and calls the matchmaker's `/bridge/<event>` over the service binding (`MATCHMAKER_URL`). The matchmaker ([../matchmaker/web_bridge.py](../matchmaker/web_bridge.py)) shares this Supabase project. It:
+**Run matching** sets `events.mm_status = 'requested'` and calls the matchmaker's `/bridge/<event>` at `MATCHMAKER_URL`, which on Vercel defaults to the same deployment's `/mm/`. The matchmaker ([../matchmaker/web_bridge.py](../matchmaker/web_bridge.py)) shares this Supabase project. It:
 
 1. Imports the answered guests into the `matchmaker` schema as attendees (`external_ref` = `people.uid`).
 2. Runs Jev precompute over every directed pair. The dashboard shows `mm_done` of `mm_total`.
@@ -60,7 +60,7 @@ Local dev: `npx vercel dev` from the repo root runs this service (through [dev.j
 
 A function only runs for its `maxDuration`, so a long precompute stops just before it and leaves the rest pending. While it works, it refreshes `mm_heartbeat_at`. When that goes quiet for 45 s (stopped or crashed), the dashboard's next poll calls `/bridge` again and it resumes where it left off.
 
-Without the binding (the matchmaker on a laptop under `uv run uvicorn --factory matchmaker.api:app`, with `MATCHER=matchmaker` here), the matchmaker polls the table for requests instead. Set `MATCHER=local` to score in this service with match.js.
+Without `MATCHMAKER_URL` (the matchmaker on a laptop under `uv run uvicorn --factory matchmaker.api:app`, with `MATCHER=matchmaker` here), the matchmaker polls the table for requests instead. Set `MATCHER=local` to score in this service with match.js.
 
 ## Team
 

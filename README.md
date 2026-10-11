@@ -184,7 +184,7 @@ The Cloudflare Worker in `web/` is the event-planning side: the host adds guests
 
 ### Deploy (Vercel)
 
-One Vercel project, two services ([vercel.json](vercel.json)): `web` (dashboard + guest page + `/api`) and `matchmaker` (this API, under `/mm`). `web` reaches `matchmaker` over a private service binding.
+One Vercel project ([vercel.json](vercel.json)) with two functions: [api/web.mjs](api/web.mjs) (dashboard and guest-page API under `/api`) and [api/mm.py](api/mm.py) (this API, under `/mm`). The pages in `web/public` are static. The web function reaches the matchmaker at the same deployment's `/mm/`.
 
 Functions only run during a request, so nothing runs in the background there:
 - **Live refresh:** `matchmaker/vercel_app.py` sets `refresh_on_request`. Attendee requests (the app polls `/current` every 3 s) run any refresh that's due. The asyncio `Scheduler` is for uvicorn only.
@@ -198,8 +198,8 @@ npx vercel link
 npx vercel env add DATABASE_URL             # transaction pooler, port 6543
 npx vercel env add TYPESAFE_API_KEY
 npx vercel env add SCORER                   # jev
-npx vercel env add HOST_KEY                 # guards setup endpoints; the web service needs the same value
-npx vercel dev                              # both services locally
+npx vercel env add HOST_KEY                 # guards setup endpoints; also sent by the web function
+npx vercel dev                              # static pages and both functions locally
 npx vercel deploy                           # preview; --prod for production
 ```
 

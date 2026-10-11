@@ -1,61 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": [
-    "yul1"
-  ],
-  "services": {
-    "web": {
-      "root": "web",
-      "entrypoint": "server.js",
-      "devCommand": "node dev.js",
-      "bindings": [
-        {
-          "type": "service",
-          "service": "matchmaker",
-          "format": "url",
-          "env": "MATCHMAKER_URL"
-        }
-      ],
-      "rewrites": [
-        {
-          "source": "/",
-          "destination": "/host.html"
-        },
-        {
-          "source": "/m/:token",
-          "destination": "/m.html"
-        }
-      ]
+  "regions": ["yul1"],
+  "framework": null,
+  "installCommand": "npm ci --prefix web",
+  "buildCommand": "",
+  "outputDirectory": "web/public",
+  "functions": {
+    "api/mm.py": {
+      "maxDuration": 300,
+      "excludeFiles": "{.env,.env.*,node_modules/**,web/**,src/**,assets/**,pitch/**,demo/**,tests/**,scripts/**,migrations/**,supabase/**,.expo/**,.hypothesis/**,.pytest_cache/**,ios/**,android/**}"
     },
-    "matchmaker": {
-      "root": ".",
-      "entrypoint": "matchmaker.vercel_app:app",
-      "functions": {
-        "matchmaker/vercel_app.py": {
-          "maxDuration": 300,
-          "excludeFiles": "{node_modules/**,web/**,src/**,assets/**,pitch/**,demo/**,tests/**,scripts/**,migrations/**,supabase/**,.expo/**}"
-        }
-      },
-      "rewrites": [
-        {
-          "source": "/mm/:path(.*)?",
-          "destination": "/:path"
-        }
-      ]
+    "api/web.mjs": {
+      "maxDuration": 300
     }
   },
   "rewrites": [
-    {
-      "source": "/mm/(.*)",
-      "destination": {
-        "service": "matchmaker"
-      }
-    },
-    {
-      "source": "/(.*)",
-      "destination": {
-        "service": "web"
-      }
-    }
+    { "source": "/mm/:path*", "destination": "/api/mm" },
+    { "source": "/api/:path*", "destination": "/api/web" },
+    { "source": "/m/:token", "destination": "/m.html" },
+    { "source": "/", "destination": "/host.html" }
   ]
 }

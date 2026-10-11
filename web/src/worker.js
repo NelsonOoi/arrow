@@ -376,7 +376,7 @@ route("POST", "/api/gatherings/:id/reextract", async (req, env, { id }) => {
 route("POST", "/api/gatherings/:id/match", async (req, env, { id }, ctx) => {
   const event = await getEvent(env, id);
   const people = await select(env, `people?event_id=eq.${v(id)}&status=eq.answered`);
-  // MATCHER=matchmaker hands off to the Python matchmaker; on Vercel the service binding implies it.
+  // MATCHER=matchmaker hands off to the Python matchmaker; on Vercel, MATCHMAKER_URL (set by server.js) implies it.
   if ((env.MATCHER ?? (env.MATCHMAKER_URL ? "matchmaker" : "local")) === "matchmaker") {
     // Hand off to the Python matchmaker (matchmaker/web_bridge.py), which runs Jev precompute and writes
     // `matches` itself. The dashboard shows its progress from mm_done / mm_total.
@@ -415,9 +415,9 @@ route("POST", "/api/gatherings/:id/send-links", async (req, env, { id }) => {
   return { sent };
 });
 
-// The matchmaker runs as a sibling service; MATCHMAKER_URL comes from the service binding in vercel.json.
-// waitUntil keeps this function alive while it works. Without the binding (matchmaker on a laptop under
-// uvicorn), the matchmaker polls the events table for requests instead.
+// On Vercel the matchmaker is the api/mm.py function on the same deployment; server.js points MATCHMAKER_URL at
+// its /mm/ path. waitUntil keeps this function alive while it works. Without MATCHMAKER_URL (matchmaker on a
+// laptop under uvicorn), the matchmaker polls the events table for requests instead.
 const MM_STALE_MS = 45000; // matches web_bridge.STALE_SECONDS
 function kickMatchmaker(env, ctx, id) {
   if (!env.MATCHMAKER_URL) return;
