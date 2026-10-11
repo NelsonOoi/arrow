@@ -1,0 +1,288 @@
+{
+  "event": {
+    "name": "Founders x Operators mentoring night"
+  },
+  "attendees": [
+    {
+      "id": "a01", "display_name": "Priya N.",
+      "seeking_text": "A mentor who has raised a seed round for a B2B SaaS company and can review my pitch deck and investor list before I start fundraising next month.",
+      "offering_text": "Solo founder of a B2B invoicing tool for small accounting firms, 40 paying customers, ex-product manager at a payroll company.",
+      "avoid_text": "",
+      "tags": {"goals": ["fundraising", "pitch feedback"], "topics": ["b2b saas", "fintech", "accounting"]}
+    },
+    {
+      "id": "a02", "display_name": "Marcus T.",
+      "seeking_text": "Someone who has moved from individual contributor engineer to engineering manager and can tell me how to run one-on-ones and handle my first underperformer.",
+      "offering_text": "Senior backend engineer, just promoted to lead a team of five at a logistics startup. Strong in Go and distributed systems.",
+      "avoid_text": "",
+      "tags": {"goals": ["first-time management", "people leadership"], "topics": ["engineering management", "backend", "logistics"]}
+    },
+    {
+      "id": "a03", "display_name": "Elena R.",
+      "seeking_text": "A UX research lead who can help me plan my first round of user interviews and turn messy notes into product decisions.",
+      "offering_text": "Product designer two years into my career at a health-tech company, mostly visual and interaction design so far.",
+      "avoid_text": "",
+      "tags": {"goals": ["user research", "career growth"], "topics": ["ux research", "product design", "health tech"]}
+    },
+    {
+      "id": "a04", "display_name": "Jamal O.",
+      "seeking_text": "Advice from someone who has sold enterprise software to hospitals: how to get through procurement, security reviews and long pilot cycles.",
+      "offering_text": "Co-founder of a clinical scheduling startup with two hospital pilots that are stuck in procurement.",
+      "avoid_text": "",
+      "tags": {"goals": ["enterprise sales", "go-to-market"], "topics": ["healthcare", "enterprise sales", "procurement"]}
+    },
+    {
+      "id": "a05", "display_name": "Sofia L.",
+      "seeking_text": "A data scientist who has shipped machine learning models to production and can help me move from notebooks to deployed, monitored models.",
+      "offering_text": "Analyst turned junior data scientist at an e-commerce company; comfortable with Python and SQL, new to MLOps.",
+      "avoid_text": "",
+      "tags": {"goals": ["mlops", "technical growth"], "topics": ["machine learning", "python", "e-commerce"]}
+    },
+    {
+      "id": "a06", "display_name": "Tomás G.",
+      "seeking_text": "Someone who has built a two-sided marketplace and solved the chicken-and-egg problem, to help me decide which side to seed first.",
+      "offering_text": "Building a marketplace that connects home cooks with office lunch orders in two cities; 300 cooks signed up, demand is the bottleneck.",
+      "avoid_text": "",
+      "tags": {"goals": ["marketplace growth", "go-to-market"], "topics": ["marketplaces", "food", "growth"]}
+    },
+    {
+      "id": "a07", "display_name": "Hannah K.",
+      "seeking_text": "An experienced seed investor or founder who can coach me on fundraising strategy and investor outreach for my climate software company.",
+      "offering_text": "Founder of carbon accounting software for mid-sized manufacturers, pre-seed raised, preparing a seed round.",
+      "avoid_text": "Anyone whose background is mainly crypto, blockchain or token projects.",
+      "tags": {"goals": ["fundraising", "investor outreach"], "topics": ["climate", "b2b saas", "manufacturing"]}
+    },
+    {
+      "id": "a08", "display_name": "Wei C.",
+      "seeking_text": "A senior engineering leader who can advise me on scaling a platform team and hiring senior engineers.",
+      "offering_text": "Staff engineer leading platform infrastructure at a 200-person fintech, about to hire four senior engineers.",
+      "avoid_text": "People who work at or for my direct competitor, Ledgerly.",
+      "tags": {"goals": ["hiring", "scaling teams"], "topics": ["platform engineering", "fintech", "infrastructure"]}
+    },
+    {
+      "id": "a09", "display_name": "Amara D.",
+      "seeking_text": "A growth marketer who can help me set up paid acquisition and measure customer acquisition cost for a consumer app.",
+      "offering_text": "Founder of a language-learning app for kids, 10k downloads, all organic so far.",
+      "avoid_text": "Anyone who promotes gambling, betting or casino apps.",
+      "tags": {"goals": ["paid acquisition", "growth"], "topics": ["consumer apps", "education", "marketing"]}
+    },
+    {
+      "id": "a10", "display_name": "Lukas B.",
+      "seeking_text": "A product leader who can teach me how to prioritise a roadmap and say no to stakeholders.",
+      "offering_text": "First product manager at a 30-person HR software startup, previously a customer success lead.",
+      "avoid_text": "Recruiters or anyone looking to hire me away from my current role.",
+      "tags": {"goals": ["roadmapping", "product management"], "topics": ["product management", "hr tech", "saas"]}
+    },
+    {
+      "id": "a11", "display_name": "Grace M.",
+      "seeking_text": "Someone who has hired and managed marketers who can help me write the job description and evaluate candidates for my first marketing hire.",
+      "offering_text": "Technical founder of a developer tools startup; I know nothing about marketing and need to hire a marketer soon.",
+      "avoid_text": "",
+      "tags": {"goals": ["hiring a marketer"], "topics": ["marketing", "developer tools", "hiring"]}
+    },
+    {
+      "id": "a12", "display_name": "Diego F.",
+      "seeking_text": "A mentor with deep Python expertise to review my open-source library's architecture and API design.",
+      "offering_text": "Maintainer of a small open-source Python library for parsing scientific data formats.",
+      "avoid_text": "",
+      "tags": {"goals": ["code review", "open source"], "topics": ["python", "open source", "api design"]}
+    },
+    {
+      "id": "a13", "display_name": "Nadia S.",
+      "seeking_text": "An experienced founder who has gone through a successful acquisition and can explain how to prepare a company for being acquired.",
+      "offering_text": "CEO of a profitable 15-person analytics agency; we have had inbound acquisition interest.",
+      "avoid_text": "",
+      "tags": {"goals": ["m&a", "exit planning"], "topics": ["acquisition", "analytics", "agency"]}
+    },
+    {
+      "id": "a14", "display_name": "Owen P.",
+      "seeking_text": "Someone who has led sales teams to help me build a sales process and hire my first account executive.",
+      "offering_text": "Founder of a field-service scheduling product; I have been doing all sales myself.",
+      "avoid_text": "",
+      "tags": {"goals": ["sales process", "hiring sales"], "topics": ["sales", "field service", "hiring"]}
+    },
+    {
+      "id": "a15", "display_name": "Ines V.",
+      "seeking_text": "Looking for a mentor who has negotiated a senior job offer and can help me ask for a higher salary and equity at my next company.",
+      "offering_text": "Mid-level software engineer interviewing for senior roles at growth-stage startups.",
+      "avoid_text": "",
+      "tags": {"goals": ["salary negotiation", "career growth"], "topics": ["careers", "compensation", "engineering"]}
+    },
+    {
+      "id": "a16", "display_name": "Ravi J.",
+      "seeking_text": "I want guidance from someone experienced at bargaining over pay packages, so I can push for better base pay and stock when I land my next senior role.",
+      "offering_text": "Software developer with about five years' experience, currently in interview loops for senior positions at scaling startups.",
+      "avoid_text": "",
+      "tags": {"goals": ["negotiating compensation", "career growth"], "topics": ["careers", "pay", "software"]}
+    },
+    {
+      "id": "a17", "display_name": "Chloe W.",
+      "seeking_text": "I'd love to learn from a CTO who has built a machine learning team from scratch; I want to understand what makes ML teams work.",
+      "offering_text": "Marketing coordinator at a retail brand, curious about AI and thinking about a career change.",
+      "avoid_text": "",
+      "tags": {"goals": ["career change", "learn about ai"], "topics": ["retail", "marketing", "ai"]}
+    },
+    {
+      "id": "a18", "display_name": "Ben A.",
+      "seeking_text": "A venture partner who invests in hardware startups and could advise on our Series A.",
+      "offering_text": "Hobbyist building a smart garden sensor on weekends; no company, no team and no revenue yet.",
+      "avoid_text": "",
+      "tags": {"goals": ["fundraising"], "topics": ["hardware", "iot", "gardening"]}
+    },
+    {
+      "id": "a19", "display_name": "Yuki H.",
+      "seeking_text": "Mentorship from a design director at a large consumer company about building a portfolio for senior design roles.",
+      "offering_text": "Backend engineer who wants to switch into design; I have no design work or portfolio yet.",
+      "avoid_text": "",
+      "tags": {"goals": ["career change", "portfolio"], "topics": ["design", "careers", "consumer"]}
+    },
+    {
+      "id": "a20", "display_name": "Fatima Z.",
+      "seeking_text": "A mentor who can help me think through pricing for a usage-based API product.",
+      "offering_text": "Product lead for a payments API at a fintech, previously a solutions engineer.",
+      "avoid_text": "",
+      "tags": {"goals": ["pricing", "product strategy"], "topics": ["pricing", "apis", "fintech"]}
+    },
+
+    {
+      "id": "b01", "display_name": "Rachel S.",
+      "seeking_text": "Early-stage B2B SaaS founders about to raise a seed round who want hands-on deck and investor-list feedback.",
+      "offering_text": "Raised a $4M seed for my B2B SaaS company selling to accountants, later angel-invested in 20 SaaS startups. I review pitch decks every week.",
+      "avoid_text": "",
+      "tags": {"goals": ["mentor founders"], "topics": ["fundraising", "b2b saas", "fintech", "pitch decks"]}
+    },
+    {
+      "id": "b02", "display_name": "David K.",
+      "seeking_text": "Newly promoted engineering managers who are struggling with the shift from coding to leading people.",
+      "offering_text": "Went from backend engineer to VP Engineering over ten years; coached dozens of first-time managers on one-on-ones, feedback and performance problems.",
+      "avoid_text": "",
+      "tags": {"goals": ["coach new managers"], "topics": ["engineering management", "people leadership", "performance management"]}
+    },
+    {
+      "id": "b03", "display_name": "Mei L.",
+      "seeking_text": "Designers early in their career who want to add user research to their skill set.",
+      "offering_text": "Head of UX research at a digital health company; I teach interview planning, synthesis and turning research into product decisions.",
+      "avoid_text": "",
+      "tags": {"goals": ["grow researchers"], "topics": ["ux research", "health tech", "product design"]}
+    },
+    {
+      "id": "b04", "display_name": "Robert E.",
+      "seeking_text": "Healthcare startup founders stuck in hospital sales cycles.",
+      "offering_text": "Sold clinical software to over 60 hospital systems; I know procurement, security questionnaires and how to convert pilots to contracts.",
+      "avoid_text": "",
+      "tags": {"goals": ["advise health founders"], "topics": ["healthcare", "enterprise sales", "procurement"]}
+    },
+    {
+      "id": "b05", "display_name": "Anika P.",
+      "seeking_text": "Junior data scientists who want to learn how to take models to production.",
+      "offering_text": "ML platform lead; I have deployed and monitored recommendation models in production at an online retailer and teach MLOps practices.",
+      "avoid_text": "",
+      "tags": {"goals": ["teach mlops"], "topics": ["machine learning", "mlops", "e-commerce", "python"]}
+    },
+    {
+      "id": "b06", "display_name": "Carlos M.",
+      "seeking_text": "Marketplace founders working through liquidity and the cold-start problem.",
+      "offering_text": "Co-founded a local services marketplace that reached liquidity in 12 cities; I have strong opinions on which side to seed first and how.",
+      "avoid_text": "",
+      "tags": {"goals": ["advise marketplace founders"], "topics": ["marketplaces", "growth", "local services"]}
+    },
+    {
+      "id": "b07", "display_name": "Victor N.",
+      "seeking_text": "Founders preparing seed rounds who want direct help with investor outreach.",
+      "offering_text": "Raised three rounds as a founder, then spent four years as a partner at a crypto and blockchain fund investing in token projects. I coach founders on fundraising strategy and outreach.",
+      "avoid_text": "",
+      "tags": {"goals": ["coach fundraising"], "topics": ["fundraising", "crypto", "blockchain", "seed"]}
+    },
+    {
+      "id": "b08", "display_name": "Sarah O.",
+      "seeking_text": "Engineers stepping up to lead platform or infrastructure teams.",
+      "offering_text": "Director of platform engineering at Ledgerly, the fintech ledger company; I scaled our infrastructure team from 5 to 40 and ran senior hiring.",
+      "avoid_text": "",
+      "tags": {"goals": ["mentor engineering leaders"], "topics": ["platform engineering", "fintech", "hiring", "infrastructure"]}
+    },
+    {
+      "id": "b09", "display_name": "Jake R.",
+      "seeking_text": "Consumer app founders who want to start paid acquisition.",
+      "offering_text": "Growth marketer who scaled paid acquisition for several consumer apps, most recently a sports betting and online casino app. Expert in CAC and LTV measurement.",
+      "avoid_text": "",
+      "tags": {"goals": ["advise on growth"], "topics": ["paid acquisition", "consumer apps", "marketing", "growth"]}
+    },
+    {
+      "id": "b10", "display_name": "Laura T.",
+      "seeking_text": "Talented product managers I could recruit for open roles at the companies I place candidates with.",
+      "offering_text": "Former head of product at two SaaS companies, now a recruiter placing product managers; I can share roadmap prioritisation frameworks.",
+      "avoid_text": "",
+      "tags": {"goals": ["recruit product managers"], "topics": ["product management", "recruiting", "saas"]}
+    },
+    {
+      "id": "b11", "display_name": "Kevin D.",
+      "seeking_text": "Other founders who have recently hired a marketer and can tell me how to evaluate marketing candidates.",
+      "offering_text": "Founder of a developer tools startup; I am trying to hire my first marketer and have lots of marketing questions myself.",
+      "avoid_text": "",
+      "tags": {"goals": ["hiring a marketer"], "topics": ["marketing", "developer tools", "hiring"]}
+    },
+    {
+      "id": "b12", "display_name": "Olga I.",
+      "seeking_text": "People curious about snakes and reptile care.",
+      "offering_text": "Professional reptile keeper; I breed ball pythons and teach python husbandry, enclosure design and handling.",
+      "avoid_text": "",
+      "tags": {"goals": ["share hobby"], "topics": ["python", "reptiles", "animal care"]}
+    },
+    {
+      "id": "b13", "display_name": "Paul G.",
+      "seeking_text": "Founders thinking about buying other companies.",
+      "offering_text": "Corporate development lead; my job is acquiring companies for a large software group, mostly as the buyer. I have never sold a company of my own.",
+      "avoid_text": "",
+      "tags": {"goals": ["find acquisition targets"], "topics": ["acquisition", "corporate development", "software"]}
+    },
+    {
+      "id": "b14", "display_name": "Zara Q.",
+      "seeking_text": "Sales professionals looking for their next account executive job.",
+      "offering_text": "Account executive with three years of experience, currently job hunting for my first sales leadership role and building my sales network.",
+      "avoid_text": "",
+      "tags": {"goals": ["job search"], "topics": ["sales", "hiring", "careers"]}
+    },
+    {
+      "id": "b15", "display_name": "Dr. Imani C.",
+      "seeking_text": "Experienced machine learning engineers who want to grow into ML leadership roles; I only take mentees with production ML experience.",
+      "offering_text": "CTO who built a 30-person machine learning team from scratch at an AI startup.",
+      "avoid_text": "",
+      "tags": {"goals": ["develop ml leaders"], "topics": ["machine learning", "ai", "engineering leadership"]}
+    },
+    {
+      "id": "b16", "display_name": "Henrik S.",
+      "seeking_text": "Hardware startups with a working product, revenue and a team, preparing a Series A.",
+      "offering_text": "Venture partner at a hardware-focused fund; I have led Series A rounds for twelve hardware companies.",
+      "avoid_text": "",
+      "tags": {"goals": ["find series a companies"], "topics": ["hardware", "iot", "venture capital", "series a"]}
+    },
+    {
+      "id": "b17", "display_name": "Lucia F.",
+      "seeking_text": "Mid-career designers with a strong existing portfolio who are aiming for senior or lead design roles.",
+      "offering_text": "Design director at a large consumer electronics company; I review senior designer portfolios and hire design leads.",
+      "avoid_text": "",
+      "tags": {"goals": ["mentor senior designers"], "topics": ["design", "portfolio", "consumer"]}
+    },
+    {
+      "id": "b18", "display_name": "Arjun M.",
+      "seeking_text": "Engineers and product people preparing for big career moves, especially compensation negotiations.",
+      "offering_text": "Engineering director who has negotiated many offers on both sides of the table; I coach people on salary, equity and level negotiation.",
+      "avoid_text": "",
+      "tags": {"goals": ["coach negotiation"], "topics": ["careers", "compensation", "engineering", "negotiation"]}
+    },
+    {
+      "id": "b19", "display_name": "Emily W.",
+      "seeking_text": "API and developer-platform product people working on pricing and packaging.",
+      "offering_text": "Former head of pricing at a usage-based API company; designed tiers, metering and overage pricing.",
+      "avoid_text": "",
+      "tags": {"goals": ["advise on pricing"], "topics": ["pricing", "apis", "developer platforms"]}
+    },
+    {
+      "id": "b20", "display_name": "Samuel O.",
+      "seeking_text": "Founders of software companies who want to talk through selling their company.",
+      "offering_text": "Founded and sold two analytics companies; I walk founders through preparing diligence, choosing advisors and negotiating an acquisition.",
+      "avoid_text": "",
+      "tags": {"goals": ["advise on exits"], "topics": ["acquisition", "exit planning", "analytics"]}
+    }
+  ]
+}

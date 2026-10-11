@@ -1,9 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { EVENT_NAME } from '@/data/users';
+import { useRoster } from '@/store/roster';
 import { colors, font, spacing } from '@/theme';
 
 export function BrandBar() {
+  const eventName = useRoster((s) => s.event?.name);
+
   return (
     <View style={styles.row}>
       <View style={styles.brand}>
@@ -13,7 +15,7 @@ export function BrandBar() {
         <Text style={styles.wordmark}>Arrow</Text>
       </View>
       <Text style={styles.event} numberOfLines={1}>
-        {EVENT_NAME}
+        {eventName}
       </Text>
     </View>
   );

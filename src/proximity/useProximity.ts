@@ -10,8 +10,9 @@ import {
 import { startPresence, stopPresence } from '@/ble/peripheral';
 import { ensureBluetoothReady, onAdapterPoweredChange } from '@/ble/permissions';
 import { startScanning, stopScanning } from '@/ble/scanner';
-import { getMatches, getUserById } from '@/data/users';
+import { getUserById } from '@/data/users';
 import { vibrateProximityAlert } from '@/haptics/alert';
+import { useLive } from '@/store/live';
 import { useRadar } from '@/store/radar';
 import { useSession } from '@/store/session';
 import type { DeviceSighting, NearbyDevice, ProximityConfig, Sighting } from '@/types';
@@ -24,36 +25,45 @@ export const PEER_FLUSH_MS = 250;
 
 /**
  * Mount once (in the tabs layout). While `useSession().scanning` is true and a user is selected,
- * runs BLE presence + scanning, feeds the engine, writes results to `useRadar`, and vibrates on alerts.
+ * runs BLE presence + scanning, feeds the engine, writes results to `useRadar`, and vibrates when the
+ * current conversation partner (from `useLive`) comes near.
  */
 export function useProximity(): void {
   const currentUserId = useSession((s) => s.currentUserId);
   const scanning = useSession((s) => s.scanning);
   const threshold = useSession((s) => s.threshold);
   const scanAllDevices = useSession((s) => s.scanAllDevices);
+  const partnerId = useLive((s) => s.conversation?.partnerId);
 
   const activeUserId = scanning && getUserById(currentUserId) ? currentUserId : null;
 
   const engineRef = useRef(initialEngineState());
   const thresholdRef = useRef(threshold);
+  const matchTokensRef = useRef<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     thresholdRef.current = threshold;
   }, [threshold]);
+
+  // Only the partner the matchmaker assigned can alert. The engine re-tags peers on its next tick,
+  // so a new pairing takes effect without restarting Bluetooth.
+  useEffect(() => {
+    const partner = getUserById(partnerId);
+    matchTokensRef.current = new Set(partner ? [partner.token] : []);
+  }, [partnerId]);
 
   useEffect(() => {
     const user = getUserById(activeUserId);
     if (!user) return;
 
     const radar = useRadar.getState();
-    const matchTokens: ReadonlySet<string> = new Set(getMatches(user).map((m) => m.token));
     const buildConfig = (): ProximityConfig => ({
       threshold: thresholdRef.current,
       hysteresis: HYSTERESIS_DB,
       windowSize: SMOOTHING_WINDOW,
       cooldownMs: ALERT_COOLDOWN_MS,
       staleMs: STALE_MS,
-      matchTokens,
+      matchTokens: matchTokensRef.current,
     });
 
     let cancelled = false;

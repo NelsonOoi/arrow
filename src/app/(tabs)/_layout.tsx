@@ -1,6 +1,7 @@
 import { router, Tabs, usePathname } from 'expo-router';
 import { useEffect, useRef } from 'react';
 
+import { useLiveMatch } from '@/live/useLiveMatch';
 import { useProximity } from '@/proximity/useProximity';
 import { useRadar } from '@/store/radar';
 import { colors, font } from '@/theme';
@@ -30,6 +31,7 @@ function useMatchCardTrigger() {
 }
 
 export default function TabsLayout() {
+  useLiveMatch();
   useProximity();
   useMatchCardTrigger();
 
@@ -47,7 +49,7 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontSize: font.body, fontWeight: '600' },
       }}>
       <Tabs.Screen name="index" options={{ title: 'Nearby' }} />
-      <Tabs.Screen name="matches" options={{ title: 'Matches' }} />
+      <Tabs.Screen name="matches" options={{ title: 'Match' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       <Tabs.Screen name="debug" options={{ title: 'Debug' }} />
     </Tabs>

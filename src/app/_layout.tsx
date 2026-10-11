@@ -1,16 +1,40 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { getUserById } from '@/data/users';
+import { API_URL } from '@/api/client';
+import { Button } from '@/components/Button';
+import { text } from '@/components/typography';
+import { useRoster } from '@/store/roster';
 import { useSession } from '@/store/session';
-import { colors } from '@/theme';
+import { colors, spacing } from '@/theme';
 
 export default function RootLayout() {
   const hasHydrated = useSession((s) => s.hasHydrated);
-  const hasUser = useSession((s) => getUserById(s.currentUserId) !== undefined);
+  const currentUserId = useSession((s) => s.currentUserId);
+  const rosterStatus = useRoster((s) => s.status);
+  const rosterError = useRoster((s) => s.error);
+  const hasUser = useRoster((s) => (currentUserId ? s.byId.has(currentUserId) : false));
+  const loadRoster = useRoster((s) => s.load);
 
-  if (!hasHydrated) {
+  useEffect(() => {
+    loadRoster();
+  }, [loadRoster]);
+
+  if (rosterStatus === 'error') {
+    return (
+      <View style={styles.loading}>
+        <StatusBar style="light" />
+        <Text style={[text.heading, styles.center]}>Can&apos;t load the event</Text>
+        <Text style={[text.muted, styles.center]}>{rosterError}</Text>
+        <Text style={[text.small, styles.center]}>Matchmaker: {API_URL}</Text>
+        <Button label="Retry" onPress={loadRoster} />
+      </View>
+    );
+  }
+
+  if (!hasHydrated || rosterStatus !== 'ready') {
     return (
       <View style={styles.loading}>
         <StatusBar style="light" />
@@ -58,5 +82,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.md,
+    padding: spacing.xl,
+  },
+  center: {
+    textAlign: 'center',
   },
 });

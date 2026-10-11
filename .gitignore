@@ -41,3 +41,17 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Python backend (matchmaker/)
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.hypothesis/
+demo/out/
+supabase/.branches
+supabase/.temp
+
+# Vercel
+.vercel

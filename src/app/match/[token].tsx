@@ -9,6 +9,7 @@ import { MatchCard } from '@/components/MatchCard';
 import { Screen } from '@/components/Screen';
 import { text } from '@/components/typography';
 import { firstName, getUserById, getUserByToken } from '@/data/users';
+import { useLive } from '@/store/live';
 import { useRadar } from '@/store/radar';
 import { useSession } from '@/store/session';
 import { spacing } from '@/theme';
@@ -20,6 +21,9 @@ export default function MatchCardScreen() {
   const currentUser = useSession((s) => getUserById(s.currentUserId));
   const met = useSession((s) => (user ? s.metUserIds.includes(user.id) : false));
   const peer = useRadar((s) => s.peers[token]);
+  const rank = useLive((s) =>
+    user && s.conversation?.partnerId === user.id ? s.conversation.rank : undefined,
+  );
 
   // Runs on button dismiss and swipe dismiss alike. Only shift if this card is still the queue
   // head, so a double cleanup can never drop the next person's card.
@@ -51,6 +55,7 @@ export default function MatchCardScreen() {
             match={user}
             peer={peer}
             met={met}
+            rank={rank}
             onFind={() => router.push({ pathname: '/find/[token]', params: { token } })}
           />
         </>
