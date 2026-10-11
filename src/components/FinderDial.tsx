@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useFrameCallback,
@@ -8,11 +8,13 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
+import Svg, { Path } from 'react-native-svg';
 
 import { BIN_DEG } from '@/proximity/sweep';
 
-const SIZE = 132;
-const PULSE_SIZE = 96;
+const SIZE = 168;
+const PULSE_SIZE = 122;
+const ARROW_SIZE = 88;
 const TICK_RADIUS = SIZE / 2 - 6;
 const RING_OFFSETS = [0, 0.5];
 
@@ -91,7 +93,16 @@ export function FinderDial({ strength, live, color, heading, covered, bearing }:
       ) : null}
 
       <Animated.View style={[styles.arrowBox, arrowStyle]}>
-        <Text style={[styles.arrow, { color }]}>↑</Text>
+        <Svg width={ARROW_SIZE} height={ARROW_SIZE} viewBox="0 0 48 48">
+          <Path
+            d="M24 42 C 23.6 32, 24.3 20, 24 7 M10 20.5 C 15 15.5, 19.5 11, 24 6.5 C 28.5 11, 33 15.5, 38 20.5"
+            stroke={color}
+            strokeWidth={5.5}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
       </Animated.View>
     </View>
   );
@@ -146,7 +157,7 @@ const styles = StyleSheet.create({
     width: PULSE_SIZE,
     height: PULSE_SIZE,
     borderRadius: PULSE_SIZE / 2,
-    borderWidth: 2,
+    borderWidth: 3,
   },
   // A full-size layer rotated about the dial's centre; children sit at its top edge.
   spoke: {
@@ -166,15 +177,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   arrowBox: {
-    width: 56,
-    height: 56,
+    width: ARROW_SIZE,
+    height: ARROW_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  arrow: {
-    textAlign: 'center',
-    fontSize: 44,
-    lineHeight: 52,
-    fontWeight: '500',
   },
 });

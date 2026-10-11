@@ -14,7 +14,7 @@ import { getUserByToken } from '@/data/users';
 import { vibrateProximityAlert } from '@/haptics/alert';
 import { useRadar } from '@/store/radar';
 import { useSession } from '@/store/session';
-import { colors, spacing } from '@/theme';
+import { colors, fonts, spacing } from '@/theme';
 import type { PeerState } from '@/types';
 
 const MAX_SAMPLES = 2000;
@@ -212,6 +212,7 @@ const styles = StyleSheet.create({
   },
   notice: {
     color: colors.near,
+    fontFamily: fonts.body,
     textAlign: 'center',
   },
   sectionTitle: {

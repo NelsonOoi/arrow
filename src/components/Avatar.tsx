@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { initials } from '@/data/users';
-import { colors } from '@/theme';
+import { colors, fonts } from '@/theme';
 import type { User } from '@/types';
 
 export function Avatar({ user, color, size = 52 }: { user: User; color: string; size?: number }) {
@@ -26,7 +26,7 @@ const styles = StyleSheet.create({
   },
   initials: {
     color: colors.ink,
-    fontWeight: '700',
+    fontFamily: fonts.bodySemibold,
     letterSpacing: 0.5,
   },
 });

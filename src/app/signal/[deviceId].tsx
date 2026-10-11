@@ -4,7 +4,7 @@ import { Button } from '@/components/Button';
 import { FinderView } from '@/components/FinderView';
 import { useScanWhileMounted } from '@/proximity/useScanWhileMounted';
 import { useRadar } from '@/store/radar';
-import { colors } from '@/theme';
+import { matchPalette } from '@/theme';
 
 function first(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value) ?? '';
@@ -28,7 +28,7 @@ export default function DeviceSignalScreen() {
 
   return (
     <FinderView
-      color={colors.primary}
+      color={matchPalette[0]}
       eyebrow="Signal test"
       title={name}
       instruction="Walk toward it. The bars fill as the signal gets stronger."

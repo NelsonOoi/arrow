@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { firstName, matchColor, sharedInterests } from '@/data/users';
-import { colors, font, radius, spacing } from '@/theme';
+import { colors, font, fonts, sheetCorners, spacing } from '@/theme';
 import type { PeerState, User } from '@/types';
 
 type MatchCardProps = {
@@ -89,17 +89,17 @@ function Fact({ label, value, highlight = false }: { label: string; value: strin
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.accentSurface,
-    borderColor: colors.accentBorder,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.lg,
-    padding: spacing.lg + spacing.xs,
+    ...sheetCorners,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    padding: spacing.xl,
     gap: spacing.lg,
   },
   eyebrow: {
-    color: colors.primary,
+    color: colors.primaryDeep,
+    fontFamily: fonts.bodySemibold,
     fontSize: font.caption,
-    fontWeight: '700',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
@@ -114,21 +114,27 @@ const styles = StyleSheet.create({
   },
   name: {
     color: colors.text,
-    fontSize: font.heading,
-    fontWeight: '600',
-    letterSpacing: -0.3,
+    fontFamily: fonts.display,
+    fontSize: 24,
+    letterSpacing: -0.5,
   },
   role: {
     color: colors.textMuted,
+    fontFamily: fonts.body,
     fontSize: font.small,
   },
   summary: {
     color: colors.text,
+    fontFamily: fonts.body,
     fontSize: font.body,
     lineHeight: 22,
   },
   facts: {
     gap: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: 1.5,
+    borderTopColor: colors.border,
+    borderStyle: 'dashed',
   },
   fact: {
     flexDirection: 'row',
@@ -137,18 +143,20 @@ const styles = StyleSheet.create({
   factLabel: {
     width: 84,
     color: colors.textMuted,
+    fontFamily: fonts.body,
     fontSize: font.small,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   factValue: {
     flex: 1,
     color: colors.textSecondary,
+    fontFamily: fonts.body,
     fontSize: font.small,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   factHighlight: {
     color: colors.near,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemibold,
   },
   action: {
     marginTop: spacing.xs,

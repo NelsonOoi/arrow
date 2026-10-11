@@ -1,3 +1,17 @@
+import {
+  Fraunces_500Medium_Italic,
+  Fraunces_600SemiBold,
+} from '@expo-google-fonts/fraunces';
+import {
+  InstrumentSans_400Regular,
+  InstrumentSans_500Medium,
+  InstrumentSans_600SemiBold,
+} from '@expo-google-fonts/instrument-sans';
+import {
+  JetBrainsMono_500Medium,
+  JetBrainsMono_800ExtraBold,
+} from '@expo-google-fonts/jetbrains-mono';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -8,7 +22,7 @@ import { Button } from '@/components/Button';
 import { text } from '@/components/typography';
 import { useRoster } from '@/store/roster';
 import { useSession } from '@/store/session';
-import { colors, spacing } from '@/theme';
+import { colors, fonts, spacing } from '@/theme';
 
 export default function RootLayout() {
   const hasHydrated = useSession((s) => s.hasHydrated);
@@ -17,15 +31,27 @@ export default function RootLayout() {
   const rosterError = useRoster((s) => s.error);
   const hasUser = useRoster((s) => (currentUserId ? s.byId.has(currentUserId) : false));
   const loadRoster = useRoster((s) => s.load);
+  // Keys must match the family names in theme.ts `fonts`.
+  const [fontsLoaded, fontError] = useFonts({
+    Fraunces_600SemiBold,
+    Fraunces_500Medium_Italic,
+    InstrumentSans_400Regular,
+    InstrumentSans_500Medium,
+    InstrumentSans_600SemiBold,
+    JetBrainsMono_500Medium,
+    JetBrainsMono_800ExtraBold,
+  });
+  // On a font error, carry on with system fonts rather than spinning forever.
+  const fontsReady = fontsLoaded || fontError !== null;
 
   useEffect(() => {
     loadRoster();
   }, [loadRoster]);
 
-  if (rosterStatus === 'error') {
+  if (fontsReady && rosterStatus === 'error') {
     return (
       <View style={styles.loading}>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
         <Text style={[text.heading, styles.center]}>Can&apos;t load the event</Text>
         <Text style={[text.muted, styles.center]}>{rosterError}</Text>
         <Text style={[text.small, styles.center]}>Matchmaker: {API_URL}</Text>
@@ -34,10 +60,10 @@ export default function RootLayout() {
     );
   }
 
-  if (!hasHydrated || rosterStatus !== 'ready') {
+  if (!fontsReady || !hasHydrated || rosterStatus !== 'ready') {
     return (
       <View style={styles.loading}>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
         <ActivityIndicator color={colors.textMuted} />
       </View>
     );
@@ -45,11 +71,12 @@ export default function RootLayout() {
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colors.background },
           headerTintColor: colors.text,
+          headerTitleStyle: { fontFamily: fonts.display, fontSize: 20 },
           headerShadowVisible: false,
           contentStyle: { backgroundColor: colors.background },
         }}>

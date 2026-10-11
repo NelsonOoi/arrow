@@ -11,7 +11,7 @@ import { useCompass } from '@/proximity/useCompass';
 import { useDirectionSweep, type SweepPhase } from '@/proximity/useDirectionSweep';
 import { useSignal, type SignalInput } from '@/proximity/useSignal';
 import { useRadar } from '@/store/radar';
-import { colors, font, radius, spacing } from '@/theme';
+import { colors, font, fonts, radius, spacing } from '@/theme';
 import type { RadarStatus } from '@/types';
 
 type FinderViewProps = {
@@ -161,8 +161,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     textAlign: 'center',
     color: colors.inkMuted,
+    fontFamily: fonts.bodySemibold,
     fontSize: font.caption,
-    fontWeight: '700',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
@@ -175,15 +175,16 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.ink,
-    fontSize: font.display,
-    lineHeight: 50,
-    fontWeight: '700',
+    fontFamily: fonts.display,
+    fontSize: font.title,
+    lineHeight: 38,
     letterSpacing: -1,
     textAlign: 'center',
   },
   instruction: {
     maxWidth: 300,
     color: colors.inkMuted,
+    fontFamily: fonts.body,
     fontSize: font.headline,
     lineHeight: 23,
     textAlign: 'center',
@@ -202,11 +203,12 @@ const styles = StyleSheet.create({
   },
   level: {
     color: colors.ink,
+    fontFamily: fonts.bodySemibold,
     fontSize: font.body,
-    fontWeight: '700',
   },
   trend: {
     color: colors.inkMuted,
+    fontFamily: fonts.body,
     fontSize: font.small,
   },
   sweepButton: {
@@ -223,6 +225,7 @@ const styles = StyleSheet.create({
   },
   noteText: {
     color: colors.ink,
+    fontFamily: fonts.body,
     fontSize: font.small,
     lineHeight: 18,
     textAlign: 'center',

@@ -14,7 +14,7 @@ import { useSignal } from '@/proximity/useSignal';
 import { useLive } from '@/store/live';
 import { useRadar } from '@/store/radar';
 import { useSession } from '@/store/session';
-import { colors, font, radius, spacing } from '@/theme';
+import { colors, font, fonts, sheetCorners, sheetCornersAlt, spacing } from '@/theme';
 import type { PeerState, RadarStatus, User } from '@/types';
 
 function KeepAwake() {
@@ -137,11 +137,11 @@ function MatchRow({ me, match, peer, scanning, divider }: MatchRowProps) {
 
 const styles = StyleSheet.create({
   hero: {
+    ...sheetCorners,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.lg,
+    padding: spacing.xl,
     gap: spacing.lg,
   },
   heroRow: {
@@ -157,9 +157,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   list: {
+    ...sheetCornersAlt,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
   },
@@ -184,15 +184,16 @@ const styles = StyleSheet.create({
   },
   name: {
     color: colors.text,
+    fontFamily: fonts.bodySemibold,
     fontSize: font.headline,
-    fontWeight: '600',
   },
   status: {
     color: colors.textMuted,
+    fontFamily: fonts.body,
     fontSize: font.small,
   },
   statusNear: {
     color: colors.near,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemibold,
   },
 });

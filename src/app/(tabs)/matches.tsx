@@ -11,7 +11,7 @@ import { checkIn, endConversation, stepAway } from '@/live/actions';
 import { useLive } from '@/store/live';
 import { useRadar } from '@/store/radar';
 import { useSession } from '@/store/session';
-import { colors } from '@/theme';
+import { colors, fonts } from '@/theme';
 
 function clockTime(ts: number): string {
   const d = new Date(ts);
@@ -100,5 +100,6 @@ export default function MatchScreen() {
 const styles = StyleSheet.create({
   error: {
     color: colors.danger,
+    fontFamily: fonts.body,
   },
 });

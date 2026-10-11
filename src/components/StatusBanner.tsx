@@ -1,7 +1,7 @@
 import { Linking, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/Button';
-import { colors, font, radius, spacing } from '@/theme';
+import { colors, font, fonts, radius, spacing } from '@/theme';
 import type { RadarStatus } from '@/types';
 
 export function statusMessage(status: RadarStatus, error: string | null): string {
@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
   },
   text: {
     color: colors.text,
+    fontFamily: fonts.bodyMedium,
     fontSize: font.body,
-    fontWeight: '500',
   },
 });

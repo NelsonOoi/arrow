@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, font, radius, spacing } from '@/theme';
+import { colors, font, fonts, radius, spacing } from '@/theme';
 
 type Tone = 'near' | 'primary' | 'muted' | 'warning' | 'danger';
 
@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   label: {
+    fontFamily: fonts.bodySemibold,
     fontSize: font.small,
-    fontWeight: '600',
   },
 });
