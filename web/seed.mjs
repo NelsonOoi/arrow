@@ -107,7 +107,7 @@ console.log(`Seeded ${EVENT.id}: 15 answered (13 by call, 2 by text), 1 texted, 
 
 // match the 15 who answered, then mark the first 6 links as sent
 const API = process.env.ARROW_URL ?? "https://arrow.sunisgreat1.workers.dev";
-const m = await fetch(`${API}/api/events/${EVENT.id}/match`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }).then((r) => r.json());
+const m = await fetch(`${API}/api/gatherings/${EVENT.id}/match`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }).then((r) => r.json());
 console.log("Matching:", JSON.stringify(m));
 await sb("PATCH", `people?uid=in.(${people.slice(0, 6).map((p) => p.uid).join(",")})`, { link_sent_at: at(75) });
 await sb("POST", "logs", { event_id: EVENT.id, msg: "Links sent: 6/6", at: at(75) });

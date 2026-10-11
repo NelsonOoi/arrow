@@ -308,10 +308,10 @@
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         status.textContent = "Reading the event…";
         await wait(700);
-        const ev = await api("/events", { body: { name: PARTIFUL_SAMPLE.name, description: PARTIFUL_SAMPLE.description, type: PARTIFUL_SAMPLE.type, host: "Partiful import" } });
+        const ev = await api("/gatherings", { body: { name: PARTIFUL_SAMPLE.name, description: PARTIFUL_SAMPLE.description, type: PARTIFUL_SAMPLE.type, host: "Partiful import" } });
         status.textContent = `Importing ${PARTIFUL_SAMPLE.guests.length} guests…`;
         const csv = PARTIFUL_SAMPLE.guests.map((n, i) => `${n}, +1555020${String(i).padStart(4, "0")}`).join("\n");
-        const { added } = await api(`/events/${ev.id}/people`, { body: { csv } });
+        const { added } = await api(`/gatherings/${ev.id}/people`, { body: { csv } });
         await wait(400);
         dlg.close();
         openEvent(ev.id);
@@ -335,7 +335,7 @@
       document.getElementById("ev-go").addEventListener("click", async () => {
         const name = document.getElementById("ev-name").value.trim();
         if (!name) return document.getElementById("ev-name").focus();
-        const ev = await api("/events", {
+        const ev = await api("/gatherings", {
           body: { name, description: document.getElementById("ev-desc").value, type: document.querySelector('input[name="type"]:checked').value },
         });
         dlg.close();
@@ -505,7 +505,7 @@
         <textarea id="csv" placeholder="Maya Chen, 514 555 0123&#10;Daniel Okafor, +15145550188"></textarea>
         <div class="row-end"><button class="btn btn--quiet" data-close>Cancel</button><button class="btn btn--primary" id="add-go">Add guests</button></div>`);
       document.getElementById("add-go").addEventListener("click", async () => {
-        const { added } = await api(`/events/${eventId}/people`, { body: { csv: document.getElementById("csv").value } });
+        const { added } = await api(`/gatherings/${eventId}/people`, { body: { csv: document.getElementById("csv").value } });
         dlg.close();
         toast(`Added ${added} guest${added === 1 ? "" : "s"}`);
         refresh();
@@ -531,7 +531,7 @@
       if (ask && !confirm(ask)) return;
       btn.disabled = true;
       try {
-        const r = await api(`/events/${eventId}/${{ call: "call", stop: "stop", collect: "collect", match: "match", links: "send-links" }[kind]}`, { body: {} });
+        const r = await api(`/gatherings/${eventId}/${{ call: "call", stop: "stop", collect: "collect", match: "match", links: "send-links" }[kind]}`, { body: {} });
         toast(
           kind === "call" ? `Calling ${r.queued} guests` :
           kind === "stop" ? "Pausing after the current call" :
@@ -548,12 +548,12 @@
     async function refresh() {
       try {
         if (!eventId) {
-          const events = await api("/events");
+          const events = await api("/gatherings");
           const json = JSON.stringify(events);
           if (json !== lastJson && !dlg.open) { lastJson = json; renderList(events); }
           return;
         }
-        const next = await api(`/events/${eventId}`);
+        const next = await api(`/gatherings/${eventId}`);
         data = next;
         const json = JSON.stringify(next);
         // don't redraw under an open dialog or while typing in search or the call plan

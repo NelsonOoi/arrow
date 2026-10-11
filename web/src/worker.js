@@ -1,5 +1,6 @@
 // Arrow on Cloudflare Workers: host dashboard at /, guest page at /m/<token>,
-// JSON API under /api. Data in Supabase, calls and texts through Dial, scoring by Jev.
+// JSON API under /api (events live at /api/gatherings: ad blockers block anything under
+// /api/events as analytics). Data in Supabase, calls and texts through Dial, scoring by Jev.
 import { placeCall, getCall, sendSms, listMessages } from "./dial.js";
 import { computeMatches, profile } from "./match.js";
 import { select, first as firstRow, insert, update, remove, v, inList } from "./db.js";
@@ -166,7 +167,7 @@ const route = (method, pattern, fn) => {
   routes.push({ method, re, keys, fn });
 };
 
-route("GET", "/api/events", async (req, env) => {
+route("GET", "/api/gatherings", async (req, env) => {
   const [events, people, matched] = await Promise.all([
     select(env, "events?order=created_at.desc"),
     select(env, "people?select=event_id,status"),
@@ -181,7 +182,7 @@ route("GET", "/api/events", async (req, env) => {
   }));
 });
 
-route("POST", "/api/events", async (req, env) => {
+route("POST", "/api/gatherings", async (req, env) => {
   const b = await req.json();
   if (!b.name) throw new HttpError(400, "name required");
   const [ev] = await insert(env, "events", {
@@ -190,7 +191,7 @@ route("POST", "/api/events", async (req, env) => {
   return ev;
 });
 
-route("GET", "/api/events/:id", async (req, env, { id }) => {
+route("GET", "/api/gatherings/:id", async (req, env, { id }) => {
   let event = await getEvent(env, id);
   try {
     await tick(env, event);
@@ -222,7 +223,7 @@ route("GET", "/api/events/:id", async (req, env, { id }) => {
   };
 });
 
-route("POST", "/api/events/:id/people", async (req, env, { id }) => {
+route("POST", "/api/gatherings/:id/people", async (req, env, { id }) => {
   const { csv } = await req.json();
   const lines = (csv ?? "").trim().split(/\r?\n/).filter(Boolean);
   if (lines[0]?.toLowerCase().includes("phone")) lines.shift();
@@ -246,7 +247,7 @@ route("DELETE", "/api/people/:uid", async (req, env, { uid }) => {
   return { ok: true };
 });
 
-route("POST", "/api/events/:id/call", async (req, env, { id }) => {
+route("POST", "/api/gatherings/:id/call", async (req, env, { id }) => {
   const event = await getEvent(env, id);
   await update(env, `people?event_id=eq.${v(id)}&status=eq.failed`, { status: "pending" });
   const pending = await select(env, `people?event_id=eq.${v(id)}&status=eq.pending&select=uid`);
@@ -256,13 +257,13 @@ route("POST", "/api/events/:id/call", async (req, env, { id }) => {
   return { queued: pending.length };
 });
 
-route("POST", "/api/events/:id/stop", async (req, env, { id }) => {
+route("POST", "/api/gatherings/:id/stop", async (req, env, { id }) => {
   await update(env, `events?id=eq.${v(id)}`, { calls_on: false });
   await log(env, id)("Calls paused after the current one");
   return { ok: true };
 });
 
-route("POST", "/api/events/:id/collect", async (req, env, { id }) => {
+route("POST", "/api/gatherings/:id/collect", async (req, env, { id }) => {
   const event = await getEvent(env, id);
   const waiting = await select(env, `people?event_id=eq.${v(id)}&status=eq.sms_sent`);
   let got = 0;
@@ -286,7 +287,7 @@ route("POST", "/api/events/:id/collect", async (req, env, { id }) => {
   return { collected: got };
 });
 
-route("POST", "/api/events/:id/match", async (req, env, { id }) => {
+route("POST", "/api/gatherings/:id/match", async (req, env, { id }) => {
   const event = await getEvent(env, id);
   const people = await select(env, `people?event_id=eq.${v(id)}&status=eq.answered`);
   const rows = await computeMatches(env, event, people, log(env, id));
@@ -295,7 +296,7 @@ route("POST", "/api/events/:id/match", async (req, env, { id }) => {
   return { people: rows.length, mutual: rows.filter((r) => r.must_meet).length };
 });
 
-route("POST", "/api/events/:id/send-links", async (req, env, { id }) => {
+route("POST", "/api/gatherings/:id/send-links", async (req, env, { id }) => {
   const event = await getEvent(env, id);
   const origin = new URL(req.url).origin;
   const uids = [...new Set((await select(env, `matches?event_id=eq.${v(id)}&select=uid`)).map((r) => r.uid))];
