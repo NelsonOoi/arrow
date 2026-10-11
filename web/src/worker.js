@@ -166,7 +166,20 @@ const route = (method, pattern, fn) => {
   routes.push({ method, re, keys, fn });
 };
 
-route("GET", "/api/events", (req, env) => select(env, "events?order=created_at.desc"));
+route("GET", "/api/events", async (req, env) => {
+  const [events, people, matched] = await Promise.all([
+    select(env, "events?order=created_at.desc"),
+    select(env, "people?select=event_id,status"),
+    select(env, "matches?select=event_id"),
+  ]);
+  const tally = (rows, id, pred = () => true) => rows.filter((r) => r.event_id === id && pred(r)).length;
+  return events.map((e) => ({
+    ...e,
+    guests: tally(people, e.id),
+    answered: tally(people, e.id, (p) => p.status === "answered"),
+    matched: tally(matched, e.id),
+  }));
+});
 
 route("POST", "/api/events", async (req, env) => {
   const b = await req.json();
