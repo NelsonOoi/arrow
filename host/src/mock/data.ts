@@ -20,6 +20,32 @@ import type {
   Voice,
 } from '../types';
 
+/** A Partiful link that always imports successfully in the mock. Shown as "Use a sample link". */
+export const SAMPLE_PARTIFUL_URL = 'https://partiful.com/e/bN7xq2LmT4sample';
+
+/**
+ * MOCK: what Arrow gets back from Partiful for a pasted link.
+ * Real version: POST /events/import { partifulUrl } -> scrape/SDK -> this shape.
+ * Fictional event; every field is what the import screen shows.
+ */
+export async function mockPartifulImport(
+  partifulUrl: string,
+): Promise<Omit<ArrowEvent, 'id' | 'phase'>> {
+  await new Promise((r) => setTimeout(r, 400));
+  return {
+    partifulUrl,
+    name: 'Build Night: Founders & Friends',
+    description:
+      'A relaxed evening for people building early-stage startups — founders, first engineers, designers, and a handful of seed investors. No pitches, no panels. Come meet the people you should know, swap notes on what you’re building, and leave with a few new friends. Drinks and snacks provided.',
+    kind: 'networking',
+    startsAt: '2026-10-24T19:00:00',
+    endsAt: '2026-10-24T22:00:00',
+    venue: 'Hayes Valley loft, San Francisco',
+    hostName: 'Jordan Lee',
+    matching: { topN: 5, graceMinutes: 15 },
+  };
+}
+
 export const seedEvents: ArrowEvent[] = [
   {
     id: 'evt-live',

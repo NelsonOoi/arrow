@@ -15,13 +15,16 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ArrowRight, Button, ButtonLink, StatusTag, TextField } from '../components/ui';
-import { seedContactsSwapped } from '../mock/data';
+import { ArrowRight, Button, ButtonLink, StatusTag } from '../components/ui';
+import { SAMPLE_PARTIFUL_URL, seedContactsSwapped } from '../mock/data';
 import { dayOfMonth, monthShort, timeShort } from '../format';
 import { useStore } from '../store';
 import type { ArrowEvent } from '../types';
 
 const STEP_NUMBER = { import: 1, questions: 2, finish: 3 } as const;
+
+/** What the host sees while an import runs. */
+const IMPORT_STAGES = ['Reading the event page', 'Pulling the guest list', 'Drafting your call plan'];
 
 export function EventsOverview() {
   const { events, getGuests, importEvent } = useStore();
@@ -30,10 +33,17 @@ export function EventsOverview() {
   const [url, setUrl] = useState('');
   const urlLooksRight = /^https?:\/\/(www\.)?partiful\.com\/e\/\S+/.test(url.trim());
 
-  const onImport = (e: FormEvent) => {
+  /** Index into IMPORT_STAGES while importing; null when idle. */
+  const [stage, setStage] = useState<number | null>(null);
+
+  const onImport = async (e: FormEvent) => {
     e.preventDefault();
-    if (!urlLooksRight) return;
-    const id = importEvent(url.trim());
+    if (!urlLooksRight || stage !== null) return;
+    // MOCK: stages are timed for the demo; the real import reports progress from the backend.
+    setStage(0);
+    const timer = setInterval(() => setStage((s) => (s === null ? s : Math.min(s + 1, IMPORT_STAGES.length - 1))), 550);
+    const [id] = await Promise.all([importEvent(url.trim()), new Promise((r) => setTimeout(r, 550 * IMPORT_STAGES.length))]);
+    clearInterval(timer);
     navigate(`/events/${id}/setup/import`);
   };
 
@@ -61,31 +71,47 @@ export function EventsOverview() {
       </header>
 
       {importOpen && (
-        <form id="import-panel" className="import-panel sheet" onSubmit={onImport}>
+        <form id="import-panel" className="import-panel sheet" onSubmit={onImport} aria-busy={stage !== null}>
           <h2>Import from Partiful</h2>
+          {/* Single line: link field + Import button never wrap. */}
           <div className="import-row">
             {/* event.partifulUrl — the public Partiful event link. Arrow pulls name, time, venue,
                 description and guest list from it. Must look like https://partiful.com/e/<id>. */}
-            <div style={{ flex: '1 1 320px' }}>
-              <TextField
-                label="Partiful event link"
-                hideLabel
-                mono
-                type="url"
-                placeholder="https://partiful.com/e/…"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                dataField="event.partifulUrl"
-                autoFocus
-              />
-            </div>
-            <Button variant="ink" size="lg" type="submit" disabled={!urlLooksRight}>
-              Import <ArrowRight />
+            <label htmlFor="partiful-url" className="visually-hidden">
+              Partiful event link
+            </label>
+            <input
+              id="partiful-url"
+              className="input input--mono"
+              type="url"
+              placeholder="https://partiful.com/e/…"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              data-field="event.partifulUrl"
+              disabled={stage !== null}
+              autoFocus
+            />
+            <Button variant="ink" type="submit" disabled={!urlLooksRight || stage !== null}>
+              {stage === null ? 'Import' : 'Importing…'}
             </Button>
           </div>
-          <p className="small soft">
-            Arrow reads the description and guest list, then walks you through three quick setup steps.
-          </p>
+          {stage === null ? (
+            <p className="small soft">
+              Arrow reads the description and guest list, then walks you through three quick setup steps.{' '}
+              {/* MOCK: fills a link the mock import always accepts. Remove once real import works. */}
+              <Button variant="quiet" className="small" onClick={() => setUrl(SAMPLE_PARTIFUL_URL)}>
+                Use a sample link
+              </Button>
+            </p>
+          ) : (
+            <ol className="import-stages" aria-live="polite">
+              {IMPORT_STAGES.map((label, i) => (
+                <li key={label} data-state={i < stage ? 'done' : i === stage ? 'active' : 'todo'}>
+                  {i < stage ? '✓' : i === stage ? '…' : '·'} {label}
+                </li>
+              ))}
+            </ol>
+          )}
         </form>
       )}
 

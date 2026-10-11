@@ -8,7 +8,7 @@
  */
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
-import { draftCallPlan, seedEvents, seedGuests } from './mock/data';
+import { draftCallPlan, mockPartifulImport, seedEvents, seedGuests } from './mock/data';
 import type { ArrowEvent, CallPlan, ChatMessage, Guest, SetupStep } from './types';
 
 type Store = {
@@ -18,8 +18,8 @@ type Store = {
   getCallPlan: (eventId: string) => CallPlan;
   getChat: (eventId: string) => ChatMessage[];
 
-  /** POST /events/import { partifulUrl } -> new event in setup. Returns the new event id. */
-  importEvent: (partifulUrl: string) => string;
+  /** POST /events/import { partifulUrl } -> new event in setup. Resolves to the new event id. */
+  importEvent: (partifulUrl: string) => Promise<string>;
   /** PATCH /events/:id */
   updateEvent: (id: string, patch: Partial<ArrowEvent>) => void;
   /** Moves an event's setup to a step (or to live after the last step). */
@@ -63,13 +63,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           },
         ],
 
-      importEvent: (partifulUrl) => {
-        // MOCK: pretend Partiful returned the same event as the seeded setup one.
+      importEvent: async (partifulUrl) => {
+        // MOCK: any link returns the same sample event; guests reuse the seeded setup list.
+        const imported = await mockPartifulImport(partifulUrl);
         const id = `evt-${Date.now()}`;
-        const template = seedEvents[1];
-        const event: ArrowEvent = { ...template, id, partifulUrl, phase: { kind: 'setup', step: 'import' } };
+        const event: ArrowEvent = { ...imported, id, phase: { kind: 'setup', step: 'import' } };
         setEvents((prev) => [event, ...prev]);
-        setGuests((prev) => ({ ...prev, [id]: seedGuests(template.id) }));
+        setGuests((prev) => ({ ...prev, [id]: seedGuests('evt-setup') }));
         setPlans((prev) => ({ ...prev, [id]: draftCallPlan(event) }));
         return id;
       },
