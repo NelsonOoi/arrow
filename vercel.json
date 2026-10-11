@@ -33,7 +33,7 @@
       "functions": {
         "matchmaker/vercel_app.py": {
           "maxDuration": 300,
-          "excludeFiles": "{node_modules/**,web/**,src/**,assets/**,pitch/**,demo/**,tests/**,scripts/**,migrations/**,supabase/**,.expo/**}"
+          "excludeFiles": "{web/**,assets/**,pitch/**,demo/**,tests/**,scripts/**,migrations/**,supabase/**,.expo/**}"
         }
       },
       "rewrites": [
