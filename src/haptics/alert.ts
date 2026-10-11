@@ -19,6 +19,11 @@ export async function vibrateProximityAlert(): Promise<void> {
   }
 }
 
+/** Confirms a direction sweep produced a bearing. Never throws. */
+export function notifyDirectionFound(): void {
+  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+}
+
 /** Light tick for "the signal just got stronger" while searching. Never throws. */
 export function tickSignalStronger(): void {
   Haptics.selectionAsync().catch(() => {});

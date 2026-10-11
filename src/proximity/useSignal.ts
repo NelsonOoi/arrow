@@ -12,7 +12,15 @@ import {
   type SignalTrend,
 } from './signal';
 
-export type SignalInput = { rssi: number; lastSeen: number } | undefined;
+export type SignalInput =
+  | {
+      /** Smoothed RSSI, for display. */
+      rssi: number;
+      /** Unsmoothed last sample; the direction sweep needs it because smoothing lags a turn. */
+      rawRssi?: number;
+      lastSeen: number;
+    }
+  | undefined;
 
 export type SignalReading = {
   /** True while advertisements are still arriving. */

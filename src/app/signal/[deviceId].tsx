@@ -32,7 +32,15 @@ export default function DeviceSignalScreen() {
       eyebrow="Signal test"
       title={name}
       instruction="Walk toward it. The bars fill as the signal gets stronger."
-      signal={device ? { rssi: device.smoothedRssi, lastSeen: device.lastSeen } : undefined}
+      signal={
+        device
+          ? {
+              rssi: device.smoothedRssi,
+              rawRssi: device.samples[device.samples.length - 1],
+              lastSeen: device.lastSeen,
+            }
+          : undefined
+      }
       note={`Device ${deviceId}`}>
       <Button size="lg" variant="ink" label="Done" onPress={done} />
     </FinderView>

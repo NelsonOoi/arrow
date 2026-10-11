@@ -4,8 +4,11 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Button } from '@/components/Button';
+import { FinderDial } from '@/components/FinderDial';
 import { SignalMeter } from '@/components/SignalMeter';
-import { SonarArrow } from '@/components/SonarArrow';
+import { useCompass } from '@/proximity/useCompass';
+import { useDirectionSweep, type SweepPhase } from '@/proximity/useDirectionSweep';
 import { useSignal, type SignalInput } from '@/proximity/useSignal';
 import { useRadar } from '@/store/radar';
 import { colors, font, radius, spacing } from '@/theme';
@@ -29,6 +32,28 @@ const TREND_LABELS = {
   farther: 'Getting farther',
   steady: 'Holding steady',
 } as const;
+
+const SWEEP_BUTTON_LABELS: Record<SweepPhase, string> = {
+  idle: 'Find direction',
+  sweeping: 'Cancel',
+  found: 'Scan again',
+  unsure: 'Try again',
+};
+
+function sweepInstruction(phase: SweepPhase, live: boolean, flat: boolean): string | null {
+  switch (phase) {
+    case 'sweeping':
+      if (!live) return 'Waiting for a signal. Stay put for a moment.';
+      if (!flat) return 'Hold your phone flat, screen up, and keep turning.';
+      return 'Hold your phone flat in front of your chest and turn slowly in a full circle.';
+    case 'found':
+      return 'Walk where the arrow points. Scan again if the signal fades.';
+    case 'unsure':
+      return "Couldn't tell which way. Try again from a more open spot, turning slowly.";
+    default:
+      return null;
+  }
+}
 
 function bluetoothProblem(status: RadarStatus): string | null {
   switch (status) {
@@ -56,6 +81,12 @@ export function FinderView({
   useKeepAwake();
   const status = useRadar((s) => s.status);
   const reading = useSignal(signal, { haptics: true });
+  const compass = useCompass();
+  const sweep = useDirectionSweep(
+    signal ? { rssi: signal.rawRssi ?? signal.rssi, lastSeen: signal.lastSeen } : undefined,
+    compass.headingRef,
+  );
+  const sweeping = sweep.phase === 'sweeping';
 
   return (
     <View style={[styles.root, { backgroundColor: color }]}>
@@ -66,11 +97,20 @@ export function FinderView({
         </Text>
 
         <View style={styles.center}>
-          <SonarArrow strength={reading.strength} live={reading.live} color={colors.ink} />
+          <FinderDial
+            strength={reading.strength}
+            live={reading.live}
+            color={colors.ink}
+            heading={compass.heading}
+            covered={sweeping ? sweep.covered : null}
+            bearing={sweep.phase === 'found' ? sweep.bearing : null}
+          />
           <Text style={styles.title} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
             {title}
           </Text>
-          <Text style={styles.instruction}>{instruction}</Text>
+          <Text style={styles.instruction} accessibilityLiveRegion="polite">
+            {sweepInstruction(sweep.phase, reading.live, compass.flat) ?? instruction}
+          </Text>
 
           <View style={styles.readout} accessibilityLiveRegion="polite">
             <SignalMeter
@@ -91,7 +131,16 @@ export function FinderView({
             </View>
           </View>
 
-          {note ? (
+          {compass.available ? (
+            <Button
+              label={SWEEP_BUTTON_LABELS[sweep.phase]}
+              variant="inkSoft"
+              onPress={sweeping ? sweep.cancel : sweep.start}
+              style={styles.sweepButton}
+            />
+          ) : null}
+
+          {note && !sweeping ? (
             <View style={styles.note}>
               <Text style={styles.noteText}>{note}</Text>
             </View>
@@ -159,6 +208,10 @@ const styles = StyleSheet.create({
   trend: {
     color: colors.inkMuted,
     fontSize: font.small,
+  },
+  sweepButton: {
+    minWidth: 180,
+    marginTop: spacing.xs,
   },
   note: {
     maxWidth: 320,

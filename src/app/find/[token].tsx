@@ -52,7 +52,11 @@ export default function FindScreen() {
       eyebrow={`Looking for ${first}`}
       title={user.name}
       instruction={`Hold your phone up so ${first} can spot this color.`}
-      signal={peer ? { rssi: peer.smoothedRssi, lastSeen: peer.lastSeen } : undefined}
+      signal={
+        peer
+          ? { rssi: peer.smoothedRssi, rawRssi: peer.lastRssi, lastSeen: peer.lastSeen }
+          : undefined
+      }
       note={topic ? `Opener: ask about ${topic}` : undefined}>
       <Button
         size="lg"
