@@ -1,0 +1,13 @@
+{
+  "name": "arrow-web",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@vercel/functions": "^3.9.11",
+    "ai": "^7.0.137",
+    "zod": "^4.6.6"
+  }
+}
